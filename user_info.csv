@@ -1,0 +1,2 @@
+userNo,registerDays,firstOrderDays,avgReleaseTimeOfLatest30day,avgPayTimeOfLatest30day,finishRateLatest30day,completedOrderNumOfLatest30day,completedBuyOrderNumOfLatest30day,completedSellOrderNumOfLatest30day,completedOrderNum,completedBuyOrderNum,completedSellOrderNum,counterpartyCount,userIdentity,badges,vipLevel,lastActiveTime,isCompanyAccount
+s5f8776c7001b3c4e9300023ccfb838f5,536,495,376.12,445.9,0.997,3055,2932,123,29074,26982,2092,15577,BLOCK_MERCHANT,"['Block', 'Pro']",2,1770201843252,True

@@ -1,0 +1,61 @@
+.schema user_info
+CREATE TABLE user_info (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userNo TEXT UNIQUE,
+                registerDays INTEGER,
+                firstOrderDays INTEGER,
+                avgReleaseTimeOfLatest30day REAL,
+                avgPayTimeOfLatest30day REAL,
+                finishRateLatest30day REAL,
+                completedOrderNumOfLatest30day INTEGER,
+                completedBuyOrderNumOfLatest30day INTEGER,
+                completedSellOrderNumOfLatest30day INTEGER,
+                completedOrderNum INTEGER,
+                completedBuyOrderNum INTEGER,
+                completedSellOrderNum INTEGER,
+                counterpartyCount INTEGER,
+                userIdentity TEXT,
+                badges TEXT,
+                vipLevel INTEGER,
+                lastActiveTime INTEGER,
+                isCompanyAccount BOOLEAN,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+.schema sell_ads
+CREATE TABLE sell_ads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userNo TEXT,
+                advNo TEXT UNIQUE,
+                tradeType TEXT,
+                priceFloatingRatio TEXT,
+                rateFloatingRatio TEXT,
+                price TEXT,
+                initAmount TEXT,
+                surplusAmount TEXT,
+                tradableQuantity TEXT,
+                amountAfterEditing TEXT,
+                maxSingleTransAmount TEXT,
+                minSingleTransAmount TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (userNo) REFERENCES user_info(userNo)
+            );
+
+.schema buy_ads
+CREATE TABLE buy_ads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                userNo TEXT,
+                advNo TEXT UNIQUE,
+                tradeType TEXT,
+                priceFloatingRatio TEXT,
+                rateFloatingRatio TEXT,
+                price TEXT,
+                initAmount TEXT,
+                surplusAmount TEXT,
+                tradableQuantity TEXT,
+                amountAfterEditing TEXT,
+                maxSingleTransAmount TEXT,
+                minSingleTransAmount TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (userNo) REFERENCES user_info(userNo)
+            );
