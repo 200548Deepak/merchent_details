@@ -111,10 +111,11 @@ def save_to_sqlite(user_info, sell_data, buy_data):
         conn = sqlite3.connect("merch_details.db")
         cursor = conn.cursor()
         
-        # Create user info table
+        # Create user info table with composite primary key (userNo, date)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_info (
-                userNo TEXT PRIMARY KEY,
+                id INTEGER,
+                userNo TEXT,
                 registerDays INTEGER,
                 firstOrderDays INTEGER,
                 avgReleaseTimeOfLatest30day REAL,
@@ -132,16 +133,18 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                 vipLevel INTEGER,
                 lastActiveTime INTEGER,
                 isCompanyAccount BOOLEAN,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                date DATE DEFAULT (date('now')),
+                PRIMARY KEY (userNo, date)
             )
         """)
         
-        # Create sell ads table
+        # Create sell ads table with composite primary key (userNo, advNo, date)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sell_ads (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER,
                 userNo TEXT,
-                advNo TEXT UNIQUE,
+                advNo TEXT,
                 tradeType TEXT,
                 priceFloatingRatio TEXT,
                 rateFloatingRatio TEXT,
@@ -153,16 +156,18 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                 maxSingleTransAmount TEXT,
                 minSingleTransAmount TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                date DATE DEFAULT (date('now')),
+                PRIMARY KEY (userNo, advNo, date),
                 FOREIGN KEY (userNo) REFERENCES user_info(userNo)
             )
         """)
         
-        # Create buy ads table
+        # Create buy ads table with composite primary key (userNo, advNo, date)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS buy_ads (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER,
                 userNo TEXT,
-                advNo TEXT UNIQUE,
+                advNo TEXT,
                 tradeType TEXT,
                 priceFloatingRatio TEXT,
                 rateFloatingRatio TEXT,
@@ -174,11 +179,14 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                 maxSingleTransAmount TEXT,
                 minSingleTransAmount TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                date DATE DEFAULT (date('now')),
+                PRIMARY KEY (userNo, advNo, date),
                 FOREIGN KEY (userNo) REFERENCES user_info(userNo)
             )
         """)
         
-        # Insert user info
+        # Insert user info with today's date
+        current_date = datetime.now().strftime('%Y-%m-%d')
         try:
             cursor.execute("""
                 INSERT INTO user_info 
@@ -186,8 +194,8 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                  finishRateLatest30day, completedOrderNumOfLatest30day, completedBuyOrderNumOfLatest30day, 
                  completedSellOrderNumOfLatest30day, completedOrderNum, completedBuyOrderNum, 
                  completedSellOrderNum, counterpartyCount, userIdentity, badges, vipLevel, 
-                 lastActiveTime, isCompanyAccount)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 lastActiveTime, isCompanyAccount, date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 user_info["userNo"],
                 user_info["registerDays"],
@@ -206,11 +214,12 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                 json.dumps(user_info["badges"]),
                 user_info["vipLevel"],
                 user_info["lastActiveTime"],
-                user_info["isCompanyAccount"]
+                user_info["isCompanyAccount"],
+                current_date
             ))
-            print("Inserted user info into database")
+            print(f"Inserted user info for {current_date} into database")
         except sqlite3.IntegrityError:
-            print("User already exists in database, updating...")
+            print(f"User data for {current_date} already exists in database, updating...")
             cursor.execute("""
                 UPDATE user_info SET 
                 registerDays=?, firstOrderDays=?, avgReleaseTimeOfLatest30day=?, avgPayTimeOfLatest30day=?,
@@ -218,7 +227,7 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                 completedSellOrderNumOfLatest30day=?, completedOrderNum=?, completedBuyOrderNum=?,
                 completedSellOrderNum=?, counterpartyCount=?, userIdentity=?, badges=?, vipLevel=?,
                 lastActiveTime=?, isCompanyAccount=?
-                WHERE userNo=?
+                WHERE userNo=? AND date=?
             """, (
                 user_info["registerDays"],
                 user_info["firstOrderDays"],
@@ -237,19 +246,20 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                 user_info["vipLevel"],
                 user_info["lastActiveTime"],
                 user_info["isCompanyAccount"],
-                user_info["userNo"]
+                user_info["userNo"],
+                current_date
             ))
-            print("Updated user info in database")
+            print(f"Updated user info for {current_date} in database")
         
-        # Insert sell ads
+        # Insert sell ads with today's date
         for ad in sell_data:
             try:
                 cursor.execute("""
                     INSERT INTO sell_ads 
                     (userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, 
                      initAmount, surplusAmount, tradableQuantity, amountAfterEditing, 
-                     maxSingleTransAmount, minSingleTransAmount)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     maxSingleTransAmount, minSingleTransAmount, date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     user_info["userNo"],
                     ad["advNo"],
@@ -262,23 +272,45 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     ad["tradableQuantity"],
                     ad["amountAfterEditing"],
                     ad["maxSingleTransAmount"],
-                    ad["minSingleTransAmount"]
+                    ad["minSingleTransAmount"],
+                    current_date
                 ))
             except sqlite3.IntegrityError:
-                pass  # Ad already exists
+                # Update if exists
+                cursor.execute("""
+                    UPDATE sell_ads SET
+                    tradeType=?, priceFloatingRatio=?, rateFloatingRatio=?, price=?,
+                    initAmount=?, surplusAmount=?, tradableQuantity=?, amountAfterEditing=?,
+                    maxSingleTransAmount=?, minSingleTransAmount=?
+                    WHERE userNo=? AND advNo=? AND date=?
+                """, (
+                    ad["tradeType"],
+                    ad["priceFloatingRatio"],
+                    ad["rateFloatingRatio"],
+                    ad["price"],
+                    ad["initAmount"],
+                    ad["surplusAmount"],
+                    ad["tradableQuantity"],
+                    ad["amountAfterEditing"],
+                    ad["maxSingleTransAmount"],
+                    ad["minSingleTransAmount"],
+                    user_info["userNo"],
+                    ad["advNo"],
+                    current_date
+                ))
         
         if sell_data:
-            print(f"Inserted {len(sell_data)} sell ads into database")
+            print(f"Inserted/Updated {len(sell_data)} sell ads for {current_date}")
         
-        # Insert buy ads
+        # Insert buy ads with today's date
         for ad in buy_data:
             try:
                 cursor.execute("""
                     INSERT INTO buy_ads 
                     (userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, 
                      initAmount, surplusAmount, tradableQuantity, amountAfterEditing, 
-                     maxSingleTransAmount, minSingleTransAmount)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     maxSingleTransAmount, minSingleTransAmount, date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     user_info["userNo"],
                     ad["advNo"],
@@ -291,13 +323,35 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     ad["tradableQuantity"],
                     ad["amountAfterEditing"],
                     ad["maxSingleTransAmount"],
-                    ad["minSingleTransAmount"]
+                    ad["minSingleTransAmount"],
+                    current_date
                 ))
             except sqlite3.IntegrityError:
-                pass  # Ad already exists
+                # Update if exists
+                cursor.execute("""
+                    UPDATE buy_ads SET
+                    tradeType=?, priceFloatingRatio=?, rateFloatingRatio=?, price=?,
+                    initAmount=?, surplusAmount=?, tradableQuantity=?, amountAfterEditing=?,
+                    maxSingleTransAmount=?, minSingleTransAmount=?
+                    WHERE userNo=? AND advNo=? AND date=?
+                """, (
+                    ad["tradeType"],
+                    ad["priceFloatingRatio"],
+                    ad["rateFloatingRatio"],
+                    ad["price"],
+                    ad["initAmount"],
+                    ad["surplusAmount"],
+                    ad["tradableQuantity"],
+                    ad["amountAfterEditing"],
+                    ad["maxSingleTransAmount"],
+                    ad["minSingleTransAmount"],
+                    user_info["userNo"],
+                    ad["advNo"],
+                    current_date
+                ))
         
         if buy_data:
-            print(f"Inserted {len(buy_data)} buy ads into database")
+            print(f"Inserted/Updated {len(buy_data)} buy ads for {current_date}")
         
         # Commit changes
         conn.commit()
