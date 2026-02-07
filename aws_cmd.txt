@@ -1,0 +1,19 @@
+( for virtual environment )
+source ~/binance/bin/activate
+
+(to move to your merchent_details folder )
+cd merchent_details
+
+(to run in background)
+nohup python3 fetch2.py > /dev/null 2>&1 &
+
+(To check weather the fetch.py is running)
+pgrep -af fetch2.py
+or
+top
+
+(To stop the process)
+pkill -f fetch2.py
+
+(To ome out of virtual environment)
+deactivate
