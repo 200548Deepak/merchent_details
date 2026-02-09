@@ -1,7 +1,10 @@
 import requests
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# Define IST timezone (UTC+5:30)
+IST = timezone(timedelta(hours=5, minutes=30))
 
 def merch_detail(user_name):
     API_URL = f"https://c2c.binance.com/bapi/c2c/v2/friendly/c2c/user/profile-and-ads-list?userNo={user_name}"
@@ -186,7 +189,7 @@ def save_to_sqlite(user_info, sell_data, buy_data):
         """)
         
         # Insert user info with today's date
-        current_date = datetime.now().strftime('%Y-%m-%d')
+        current_date = datetime.now(IST).strftime('%Y-%m-%d')
         try:
             cursor.execute("""
                 INSERT INTO user_info 
