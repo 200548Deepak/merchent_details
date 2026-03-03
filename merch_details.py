@@ -381,7 +381,7 @@ def fetch_all_users():
         print(f"\nFetching details for {total_users} users...")
         print("="*60)
         
-        successful = 0
+        successful = 0   
         failed = 0
         
         for index, (user_no,) in enumerate(users, 1):
