@@ -369,7 +369,7 @@ def fetch_all_users():
     """Fetch details for all users from the users table"""
     try:
         # Connect to binance_merch database to get user numbers
-        conn_source = sqlite3.connect("binance_merch.db")
+        conn_source = sqlite3.connect(r"/home/ubuntu/merchent_details/binance_merch.db")
         cursor_source = conn_source.cursor()
         
         # Get all user numbers
@@ -381,7 +381,7 @@ def fetch_all_users():
         print(f"\nFetching details for {total_users} users...")
         print("="*60)
         
-        successful = 0
+        successful = 0   
         failed = 0
         
         for index, (user_no,) in enumerate(users, 1):
