@@ -1,6 +1,7 @@
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from flask import Flask, render_template_string, request
 
@@ -9,6 +10,7 @@ DB_PATH = BASE_DIR / "merch_details.db"
 ALLOWED_TABLES = ["user_info", "sell_ads", "buy_ads"]
 
 app = Flask(__name__)
+IST_TZ = timezone(timedelta(hours=5, minutes=30))
 
 TEMPLATE = """
 <!doctype html>
@@ -68,6 +70,16 @@ TEMPLATE = """
         </div>
 
         <div class="field">
+          <label for="last_active_from">Last Active From (IST)</label>
+          <input id="last_active_from" type="datetime-local" name="last_active_from" value="{{ filters.last_active_from }}" />
+        </div>
+
+        <div class="field">
+          <label for="last_active_to">Last Active To (IST)</label>
+          <input id="last_active_to" type="datetime-local" name="last_active_to" value="{{ filters.last_active_to }}" />
+        </div>
+
+        <div class="field">
           <label for="limit">Limit</label>
           <input id="limit" type="number" min="1" max="1000" name="limit" value="{{ filters.limit }}" />
         </div>
@@ -120,6 +132,13 @@ TEMPLATE = """
   {% if error %}
     <div class="card error">{{ error }}</div>
   {% else %}
+    {% if query_executed %}
+      <div class="card muted">
+        <b>Debug - SQL Query:</b><br>
+        <code>{{ query_executed }}</code><br>
+        <b>Parameters:</b> {{ query_params }}
+      </div>
+    {% endif %}
     <div class="card table-wrap">
       <table>
         <thead>
@@ -177,6 +196,8 @@ def sanitize_filters(args: Dict[str, str]) -> Dict[str, str]:
         "user_no": args.get("user_no", "").strip(),
         "date_from": args.get("date_from", "").strip(),
         "date_to": args.get("date_to", "").strip(),
+        "last_active_from": args.get("last_active_from", "").strip(),
+        "last_active_to": args.get("last_active_to", "").strip(),
         "limit": limit,
         "col_name": args.get("col_name", "").strip(),
         "col_op": col_op,
@@ -184,9 +205,36 @@ def sanitize_filters(args: Dict[str, str]) -> Dict[str, str]:
     }
 
 
-def build_query(table_name: str, columns: List[str], filters: Dict[str, str]) -> Tuple[str, List[str]]:
+def parse_ist_datetime_to_epoch_ms(value: str, end_of_range: bool = False) -> Optional[int]:
+    if not value:
+        return None
+
+    parsed_dt = None
+    matched_format = ""
+    for dt_format in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            parsed_dt = datetime.strptime(value, dt_format)
+            matched_format = dt_format
+            break
+        except ValueError:
+            continue
+
+    if parsed_dt is None:
+        return None
+
+    if matched_format == "%Y-%m-%d":
+        if end_of_range:
+            parsed_dt = parsed_dt.replace(hour=23, minute=59, second=59, microsecond=999000)
+        else:
+            parsed_dt = parsed_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    parsed_dt = parsed_dt.replace(tzinfo=IST_TZ)
+    return int(parsed_dt.timestamp() * 1000)
+
+
+def build_query(table_name: str, columns: List[str], filters: Dict[str, str]) -> Tuple[str, List[object]]:
     where_clauses = []
-    params: List[str] = []
+    params: List[object] = []
 
     if "userNo" in columns and filters["user_no"]:
         where_clauses.append("userNo LIKE ?")
@@ -200,17 +248,38 @@ def build_query(table_name: str, columns: List[str], filters: Dict[str, str]) ->
         where_clauses.append("date(date) <= date(?)")
         params.append(filters["date_to"])
 
+    last_active_column = next((col for col in columns if col.lower() == "lastactivetime"), None)
+    if last_active_column and filters["last_active_from"]:
+        from_ms = parse_ist_datetime_to_epoch_ms(filters["last_active_from"], end_of_range=False)
+        if from_ms is not None:
+            where_clauses.append(f"CAST({last_active_column} AS INTEGER) >= ?")
+            params.append(from_ms)
+
+    if last_active_column and filters["last_active_to"]:
+        to_ms = parse_ist_datetime_to_epoch_ms(filters["last_active_to"], end_of_range=True)
+        if to_ms is not None:
+            where_clauses.append(f"CAST({last_active_column} AS INTEGER) <= ?")
+            params.append(to_ms)
+
     # Column-level filter
     if filters["col_name"] and filters["col_val"]:
         col_name = filters["col_name"]
         if col_name in columns:
             operator = filters["col_op"]
-            if operator == "LIKE":
+            col_val = filters["col_val"]
+            
+            # For non-numeric operators, always use LIKE to handle JSON and text
+            if operator in ["=", "LIKE"]:
                 where_clauses.append(f"{col_name} LIKE ?")
-                params.append(f"%{filters['col_val']}%")
+                params.append(f"%{col_val}%")
             else:
-                where_clauses.append(f"{col_name} {operator} ?")
-                params.append(filters["col_val"])
+                # For numeric comparisons, cast to REAL
+                where_clauses.append(f"CAST({col_name} AS REAL) {operator} ?")
+                try:
+                    params.append(float(col_val))
+                except ValueError:
+                    # If value is not numeric, skip this filter
+                    pass
 
     sql = f"SELECT * FROM {table_name}"
     if where_clauses:
@@ -228,6 +297,30 @@ def build_query(table_name: str, columns: List[str], filters: Dict[str, str]) ->
     return sql, params
 
 
+def format_last_active_time(columns: List[str], rows: List[Tuple]) -> List[Tuple]:
+    try:
+        last_active_idx = next(i for i, col in enumerate(columns) if col.lower() == "lastactivetime")
+    except StopIteration:
+        return rows
+
+    formatted_rows: List[Tuple] = []
+    for row in rows:
+        row_values = list(row)
+        raw_value = row_values[last_active_idx]
+
+        if raw_value is not None and str(raw_value).strip() != "":
+            try:
+                epoch_ms = int(float(raw_value))
+                dt_ist = datetime.fromtimestamp(epoch_ms / 1000, tz=IST_TZ)
+                row_values[last_active_idx] = dt_ist.strftime("%Y-%m-%d %H:%M:%S IST")
+            except (ValueError, OSError, OverflowError):
+                pass
+
+        formatted_rows.append(tuple(row_values))
+
+    return formatted_rows
+
+
 @app.route("/")
 def dashboard():
     filters = sanitize_filters(request.args)
@@ -242,6 +335,8 @@ def dashboard():
     row_count = 0
     total_rows = 0
     distinct_users = 0
+    query_executed = ""
+    query_params = []
 
     try:
         with get_connection() as conn:
@@ -251,8 +346,12 @@ def dashboard():
                 raise ValueError(f"Table '{filters['table']}' not found")
 
             query, params = build_query(filters["table"], columns, filters)
+            query_executed = query
+            query_params = params[:-1]  # Exclude LIMIT param for clarity
+            
             result = conn.execute(query, params).fetchall()
             rows = [tuple(r) for r in result]
+            rows = format_last_active_time(columns, rows)
             row_count = len(rows)
 
             total_rows = conn.execute(f"SELECT COUNT(*) FROM {filters['table']}").fetchone()[0]
@@ -275,6 +374,8 @@ def dashboard():
         total_rows=total_rows,
         distinct_users=distinct_users,
         error=error,
+        query_executed=query_executed,
+        query_params=query_params,
     )
 
 
