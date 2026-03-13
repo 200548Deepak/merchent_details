@@ -111,7 +111,7 @@ def save_to_sqlite(user_info, sell_data, buy_data):
     """Save extracted data to SQLite3 database"""
     try:
         # Connect to database
-        conn = sqlite3.connect("merch_details.db")
+        conn = sqlite3.connect("/home/ubuntu/merchent_details/merch_details.db")
         cursor = conn.cursor()
         
         # Create user info table with composite primary key (userNo, date)
