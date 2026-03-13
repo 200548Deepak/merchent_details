@@ -55,6 +55,8 @@ def merch_detail(user_name):
                 "amountAfterEditing": ad.get("amountAfterEditing"),
                 "maxSingleTransAmount": ad.get("maxSingleTransAmount"),
                 "minSingleTransAmount": ad.get("minSingleTransAmount"),
+                "adCreatedTime": ad.get("createTime"),
+                "adUpdatedTime": ad.get("advUpdateTime"),
             })
         
         # Extract buy list
@@ -73,6 +75,8 @@ def merch_detail(user_name):
                 "amountAfterEditing": ad.get("amountAfterEditing"),
                 "maxSingleTransAmount": ad.get("maxSingleTransAmount"),
                 "minSingleTransAmount": ad.get("minSingleTransAmount"),
+                "adCreatedTime": ad.get("createTime"),
+                "adUpdatedTime": ad.get("advUpdateTime"),
             })
         
         # Display results
@@ -158,6 +162,8 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                 amountAfterEditing TEXT,
                 maxSingleTransAmount TEXT,
                 minSingleTransAmount TEXT,
+                adCreatedTime INTEGER,
+                adUpdatedTime INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 date DATE DEFAULT (date('now')),
                 PRIMARY KEY (userNo, advNo, date),
@@ -181,12 +187,23 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                 amountAfterEditing TEXT,
                 maxSingleTransAmount TEXT,
                 minSingleTransAmount TEXT,
+                adCreatedTime INTEGER,
+                adUpdatedTime INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 date DATE DEFAULT (date('now')),
                 PRIMARY KEY (userNo, advNo, date),
                 FOREIGN KEY (userNo) REFERENCES user_info(userNo)
             )
         """)
+
+        # Backward-compatible migration for existing databases created before ad timestamps were added.
+        for table_name in ("sell_ads", "buy_ads"):
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            existing_columns = {row[1] for row in cursor.fetchall()}
+            if "adCreatedTime" not in existing_columns:
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN adCreatedTime INTEGER")
+            if "adUpdatedTime" not in existing_columns:
+                cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN adUpdatedTime INTEGER")
         
         # Insert user info with today's date
         current_date = datetime.now(IST).strftime('%Y-%m-%d')
@@ -261,8 +278,8 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     INSERT INTO sell_ads 
                     (userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, 
                      initAmount, surplusAmount, tradableQuantity, amountAfterEditing, 
-                     maxSingleTransAmount, minSingleTransAmount, date)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     maxSingleTransAmount, minSingleTransAmount, adCreatedTime, adUpdatedTime, date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     user_info["userNo"],
                     ad["advNo"],
@@ -276,6 +293,8 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     ad["amountAfterEditing"],
                     ad["maxSingleTransAmount"],
                     ad["minSingleTransAmount"],
+                    ad["adCreatedTime"],
+                    ad["adUpdatedTime"],
                     current_date
                 ))
             except sqlite3.IntegrityError:
@@ -284,7 +303,7 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     UPDATE sell_ads SET
                     tradeType=?, priceFloatingRatio=?, rateFloatingRatio=?, price=?,
                     initAmount=?, surplusAmount=?, tradableQuantity=?, amountAfterEditing=?,
-                    maxSingleTransAmount=?, minSingleTransAmount=?
+                    maxSingleTransAmount=?, minSingleTransAmount=?, adCreatedTime=?, adUpdatedTime=?
                     WHERE userNo=? AND advNo=? AND date=?
                 """, (
                     ad["tradeType"],
@@ -297,6 +316,8 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     ad["amountAfterEditing"],
                     ad["maxSingleTransAmount"],
                     ad["minSingleTransAmount"],
+                    ad["adCreatedTime"],
+                    ad["adUpdatedTime"],
                     user_info["userNo"],
                     ad["advNo"],
                     current_date
@@ -312,8 +333,8 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     INSERT INTO buy_ads 
                     (userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, 
                      initAmount, surplusAmount, tradableQuantity, amountAfterEditing, 
-                     maxSingleTransAmount, minSingleTransAmount, date)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     maxSingleTransAmount, minSingleTransAmount, adCreatedTime, adUpdatedTime, date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     user_info["userNo"],
                     ad["advNo"],
@@ -327,6 +348,8 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     ad["amountAfterEditing"],
                     ad["maxSingleTransAmount"],
                     ad["minSingleTransAmount"],
+                    ad["adCreatedTime"],
+                    ad["adUpdatedTime"],
                     current_date
                 ))
             except sqlite3.IntegrityError:
@@ -335,7 +358,7 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     UPDATE buy_ads SET
                     tradeType=?, priceFloatingRatio=?, rateFloatingRatio=?, price=?,
                     initAmount=?, surplusAmount=?, tradableQuantity=?, amountAfterEditing=?,
-                    maxSingleTransAmount=?, minSingleTransAmount=?
+                    maxSingleTransAmount=?, minSingleTransAmount=?, adCreatedTime=?, adUpdatedTime=?
                     WHERE userNo=? AND advNo=? AND date=?
                 """, (
                     ad["tradeType"],
@@ -348,6 +371,8 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     ad["amountAfterEditing"],
                     ad["maxSingleTransAmount"],
                     ad["minSingleTransAmount"],
+                    ad["adCreatedTime"],
+                    ad["adUpdatedTime"],
                     user_info["userNo"],
                     ad["advNo"],
                     current_date
@@ -411,3 +436,4 @@ fetch_all_users()
 
 # Or run for a single user
 # merch_detail("s5f8776c7001b3c4e9300023ccfb838f5")
+
