@@ -297,24 +297,33 @@ def build_query(table_name: str, columns: List[str], filters: Dict[str, str]) ->
     return sql, params
 
 
-def format_last_active_time(columns: List[str], rows: List[Tuple]) -> List[Tuple]:
-    try:
-        last_active_idx = next(i for i, col in enumerate(columns) if col.lower() == "lastactivetime")
-    except StopIteration:
+def format_epoch_ms_time_columns(columns: List[str], rows: List[Tuple]) -> List[Tuple]:
+    # Fields stored as epoch milliseconds that should be displayed in IST.
+    epoch_ms_fields = {"lastactivetime", "adcreatedtime", "adupdatedtime"}
+    index_to_col = {
+        idx: col_name
+        for idx, col_name in enumerate(columns)
+        if col_name.lower() in epoch_ms_fields
+    }
+
+    if not index_to_col:
         return rows
 
     formatted_rows: List[Tuple] = []
     for row in rows:
         row_values = list(row)
-        raw_value = row_values[last_active_idx]
 
-        if raw_value is not None and str(raw_value).strip() != "":
+        for idx in index_to_col:
+            raw_value = row_values[idx]
+            if raw_value is None or str(raw_value).strip() == "":
+                continue
+
             try:
                 epoch_ms = int(float(raw_value))
                 dt_ist = datetime.fromtimestamp(epoch_ms / 1000, tz=IST_TZ)
-                row_values[last_active_idx] = dt_ist.strftime("%Y-%m-%d %H:%M:%S IST")
+                row_values[idx] = dt_ist.strftime("%Y-%m-%d %H:%M:%S IST")
             except (ValueError, OSError, OverflowError):
-                pass
+                continue
 
         formatted_rows.append(tuple(row_values))
 
@@ -351,7 +360,7 @@ def dashboard():
             
             result = conn.execute(query, params).fetchall()
             rows = [tuple(r) for r in result]
-            rows = format_last_active_time(columns, rows)
+            rows = format_epoch_ms_time_columns(columns, rows)
             row_count = len(rows)
 
             total_rows = conn.execute(f"SELECT COUNT(*) FROM {filters['table']}").fetchone()[0]
