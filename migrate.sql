@@ -53,14 +53,16 @@ CREATE TABLE sell_ads (
     amountAfterEditing TEXT,
     maxSingleTransAmount TEXT,
     minSingleTransAmount TEXT,
+    adCreatedTime INTEGER,
+    adUpdatedTime INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     date DATE,
     PRIMARY KEY (userNo, date),
     FOREIGN KEY (userNo) REFERENCES user_info(userNo)
 );
 
-INSERT INTO sell_ads (id, userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, initAmount, surplusAmount, tradableQuantity, amountAfterEditing, maxSingleTransAmount, minSingleTransAmount, created_at, date)
-SELECT id, userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, initAmount, surplusAmount, tradableQuantity, amountAfterEditing, maxSingleTransAmount, minSingleTransAmount, created_at, date(created_at) FROM sell_ads_old;
+INSERT INTO sell_ads (id, userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, initAmount, surplusAmount, tradableQuantity, amountAfterEditing, maxSingleTransAmount, minSingleTransAmount, adCreatedTime, adUpdatedTime, created_at, date)
+SELECT id, userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, initAmount, surplusAmount, tradableQuantity, amountAfterEditing, maxSingleTransAmount, minSingleTransAmount, NULL, NULL, created_at, date(created_at) FROM sell_ads_old;
 
 DROP TABLE sell_ads_old;
 
@@ -81,13 +83,15 @@ CREATE TABLE buy_ads (
     amountAfterEditing TEXT,
     maxSingleTransAmount TEXT,
     minSingleTransAmount TEXT,
+    adCreatedTime INTEGER,
+    adUpdatedTime INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     date DATE,
     PRIMARY KEY (userNo, date),
     FOREIGN KEY (userNo) REFERENCES user_info(userNo)
 );
 
-INSERT INTO buy_ads (id, userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, initAmount, surplusAmount, tradableQuantity, amountAfterEditing, maxSingleTransAmount, minSingleTransAmount, created_at, date)
-SELECT id, userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, initAmount, surplusAmount, tradableQuantity, amountAfterEditing, maxSingleTransAmount, minSingleTransAmount, created_at, date(created_at) FROM buy_ads_old;
+INSERT INTO buy_ads (id, userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, initAmount, surplusAmount, tradableQuantity, amountAfterEditing, maxSingleTransAmount, minSingleTransAmount, adCreatedTime, adUpdatedTime, created_at, date)
+SELECT id, userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, initAmount, surplusAmount, tradableQuantity, amountAfterEditing, maxSingleTransAmount, minSingleTransAmount, NULL, NULL, created_at, date(created_at) FROM buy_ads_old;
 
 DROP TABLE buy_ads_old;
