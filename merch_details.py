@@ -115,7 +115,7 @@ def save_to_sqlite(user_info, sell_data, buy_data):
     """Save extracted data to SQLite3 database"""
     try:
         # Connect to database
-        conn = sqlite3.connect("/home/ubuntu/merchent_details/merch_details.db")
+        conn = sqlite3.connect(r"/home/ubuntu/merchent_details/merch_details.db")
         cursor = conn.cursor()
         
         # Create user info table with composite primary key (userNo, date)
@@ -206,7 +206,9 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                 cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN adUpdatedTime INTEGER")
         
         # Insert user info with today's date
-        current_date = datetime.now(IST).strftime('%Y-%m-%d')
+        now_ist = datetime.now(IST)
+        current_date = now_ist.strftime('%Y-%m-%d')
+        current_ist_ts = now_ist.strftime('%Y-%m-%d %H:%M:%S')
         try:
             cursor.execute("""
                 INSERT INTO user_info 
@@ -214,8 +216,8 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                  finishRateLatest30day, completedOrderNumOfLatest30day, completedBuyOrderNumOfLatest30day, 
                  completedSellOrderNumOfLatest30day, completedOrderNum, completedBuyOrderNum, 
                  completedSellOrderNum, counterpartyCount, userIdentity, badges, vipLevel, 
-                 lastActiveTime, isCompanyAccount, date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 lastActiveTime, isCompanyAccount, created_at, date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 user_info["userNo"],
                 user_info["registerDays"],
@@ -235,6 +237,7 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                 user_info["vipLevel"],
                 user_info["lastActiveTime"],
                 user_info["isCompanyAccount"],
+                current_ist_ts,
                 current_date
             ))
             print(f"Inserted user info for {current_date} into database")
@@ -278,8 +281,8 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     INSERT INTO sell_ads 
                     (userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, 
                      initAmount, surplusAmount, tradableQuantity, amountAfterEditing, 
-                     maxSingleTransAmount, minSingleTransAmount, adCreatedTime, adUpdatedTime, date)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     maxSingleTransAmount, minSingleTransAmount, adCreatedTime, adUpdatedTime, created_at, date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     user_info["userNo"],
                     ad["advNo"],
@@ -295,6 +298,7 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     ad["minSingleTransAmount"],
                     ad["adCreatedTime"],
                     ad["adUpdatedTime"],
+                    current_ist_ts,
                     current_date
                 ))
             except sqlite3.IntegrityError:
@@ -333,8 +337,8 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     INSERT INTO buy_ads 
                     (userNo, advNo, tradeType, priceFloatingRatio, rateFloatingRatio, price, 
                      initAmount, surplusAmount, tradableQuantity, amountAfterEditing, 
-                     maxSingleTransAmount, minSingleTransAmount, adCreatedTime, adUpdatedTime, date)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     maxSingleTransAmount, minSingleTransAmount, adCreatedTime, adUpdatedTime, created_at, date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     user_info["userNo"],
                     ad["advNo"],
@@ -350,6 +354,7 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                     ad["minSingleTransAmount"],
                     ad["adCreatedTime"],
                     ad["adUpdatedTime"],
+                    current_ist_ts,
                     current_date
                 ))
             except sqlite3.IntegrityError:
@@ -436,4 +441,3 @@ fetch_all_users()
 
 # Or run for a single user
 # merch_detail("s5f8776c7001b3c4e9300023ccfb838f5")
-
