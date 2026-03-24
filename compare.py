@@ -1,181 +1,123 @@
 import sqlite3
-from typing import List, Optional, Tuple
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Sequence
 
-DB_PATH = r"E:\Deepak\Work\merchent_details\merch_details.db"
+SOURCE_DB_PATH = Path(r"E:\Deepak\Work\merchent_details\merch_details.db")
+TARGET_DB_PATH = Path(r"E:\Deepak\Work\merchent_details\compare.db")
+SOURCE_TABLE = "user_info"
+TARGET_TABLE = "compare"
 
-
-def detect_date_column(conn: sqlite3.Connection) -> str:
-	columns = [row[1] for row in conn.execute("PRAGMA table_info(user_info)")]
-	if "date" in columns:
-		return "date"
-	if "created_at" in columns:
-		return "created_at"
-	raise ValueError("user_info does not contain a date column")
-
-
-def fetch_daily_diffs(
-	conn: sqlite3.Connection,
-	date_col: str,
-) -> List[Tuple[str, str, int, int, int]]:
-	query = f"""
-	WITH daily AS (
-		SELECT
-			userNo,
-			date({date_col}) AS day,
-			MAX(completedOrderNumOfLatest30day) AS value
-		FROM user_info
-		WHERE completedOrderNumOfLatest30day IS NOT NULL
-		GROUP BY userNo, day
-	),
-	diffs AS (
-		SELECT
-			d.userNo,
-			d.day AS day,
-			d.value AS value,
-			p.value AS prev_value,
-			d.value - p.value AS diff
-		FROM daily d
-		JOIN daily p
-			ON d.userNo = p.userNo
-			AND p.day = date(d.day, '-1 day')
-	)
-	SELECT day, userNo, value, prev_value, diff
-	FROM diffs
-	ORDER BY day, userNo;
-	"""
-	return conn.execute(query).fetchall()
+COMPARE_COLUMNS = [
+    "completedOrderNum",
+    "completedBuyOrderNum",
+    "completedSellOrderNum",
+]
 
 
-def fetch_avg_diff_overall(
-	conn: sqlite3.Connection,
-	date_col: str,
-) -> Optional[float]:
-	query = f"""
-	WITH daily AS (
-		SELECT
-			userNo,
-			date({date_col}) AS day,
-			MAX(completedOrderNumOfLatest30day) AS value
-		FROM user_info
-		WHERE completedOrderNumOfLatest30day IS NOT NULL
-		GROUP BY userNo, day
-	),
-	diffs AS (
-		SELECT
-			d.userNo,
-			d.day AS day,
-			d.value - p.value AS diff
-		FROM daily d
-		JOIN daily p
-			ON d.userNo = p.userNo
-			AND p.day = date(d.day, '-1 day')
-	)
-	SELECT AVG(diff) FROM diffs;
-	"""
-	row = conn.execute(query).fetchone()
-	return row[0] if row else None
+@dataclass
+class ColumnMeta:
+    name: str
+    type_name: str
+    is_pk: bool
 
 
-def fetch_avg_diff_by_day(
-	conn: sqlite3.Connection,
-	date_col: str,
-) -> List[Tuple[str, float, int]]:
-	query = f"""
-	WITH daily AS (
-		SELECT
-			userNo,
-			date({date_col}) AS day,
-			MAX(completedOrderNumOfLatest30day) AS value
-		FROM user_info
-		WHERE completedOrderNumOfLatest30day IS NOT NULL
-		GROUP BY userNo, day
-	),
-	diffs AS (
-		SELECT
-			d.userNo,
-			d.day AS day,
-			d.value - p.value AS diff
-		FROM daily d
-		JOIN daily p
-			ON d.userNo = p.userNo
-			AND p.day = date(d.day, '-1 day')
-	)
-	SELECT day, AVG(diff) AS avg_diff, COUNT(*) AS sample_count
-	FROM diffs
-	GROUP BY day
-	ORDER BY day;
-	"""
-	return conn.execute(query).fetchall()
+def quote_ident(name: str) -> str:
+    return '"' + name.replace('"', '""') + '"'
 
 
-def store_daily_diffs(
-	conn: sqlite3.Connection,
-	date_col: str,
-) -> int:
-	conn.execute("""
-	CREATE TABLE IF NOT EXISTS user_info_diffs (
-		userNo TEXT,
-		day DATE,
-		value INTEGER,
-		prev_value INTEGER,
-		diff INTEGER,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		PRIMARY KEY (userNo, day)
-	)
-	""")
+def get_table_columns(conn: sqlite3.Connection, db_alias: str, table_name: str) -> List[ColumnMeta]:
+    rows = conn.execute(
+        f"PRAGMA {quote_ident(db_alias)}.table_info({quote_ident(table_name)})"
+    ).fetchall()
+    return [ColumnMeta(name=row[1], type_name=(row[2] or ""), is_pk=bool(row[5])) for row in rows]
 
-	query = f"""
-	WITH daily AS (
-		SELECT
-			userNo,
-			date({date_col}) AS day,
-			MAX(completedOrderNumOfLatest30day) AS value
-		FROM user_info
-		WHERE completedOrderNumOfLatest30day IS NOT NULL
-		GROUP BY userNo, day
-	),
-	diffs AS (
-		SELECT
-			d.userNo,
-			d.day AS day,
-			d.value AS value,
-			p.value AS prev_value,
-			d.value - p.value AS diff
-		FROM daily d
-		JOIN daily p
-			ON d.userNo = p.userNo
-			AND p.day = date(d.day, '-1 day')
-	)
-	INSERT OR REPLACE INTO user_info_diffs (userNo, day, value, prev_value, diff)
-	SELECT userNo, day, value, prev_value, diff
-	FROM diffs;
-	"""
 
-	cur = conn.execute(query)
-	conn.commit()
-	return cur.rowcount
+def detect_date_column(columns: Sequence[ColumnMeta]) -> str:
+    names = {c.name for c in columns}
+    if "date" in names:
+        return "date"
+    if "created_at" in names:
+        return "created_at"
+    raise ValueError("user_info has no date or created_at column")
+
+
+def detect_partition_columns(columns: Sequence[ColumnMeta], date_col: str) -> List[str]:
+    if any(c.name == "userNo" for c in columns):
+        return ["userNo"]
+
+    pk_cols = [c.name for c in columns if c.is_pk and c.name != date_col]
+    if pk_cols:
+        return pk_cols
+
+    raise ValueError("No partition column available to compare current day with previous day")
+
+
+def validate_compare_columns(columns: Sequence[ColumnMeta]) -> None:
+    names = {c.name for c in columns}
+    missing = [c for c in COMPARE_COLUMNS if c not in names]
+    if missing:
+        raise ValueError(f"Missing required compare columns in user_info: {', '.join(missing)}")
+
+
+def create_compare_table(conn: sqlite3.Connection) -> int:
+    columns = get_table_columns(conn, "src", SOURCE_TABLE)
+    validate_compare_columns(columns)
+
+    date_col = detect_date_column(columns)
+    partition_cols = detect_partition_columns(columns, date_col)
+
+    base_defs = [
+        f"{quote_ident(c.name)} {(c.type_name or 'TEXT')}"
+        for c in columns
+    ]
+    diff_defs = [f"{quote_ident(f'{name}_diff')} INTEGER" for name in COMPARE_COLUMNS]
+
+    conn.execute(f"DROP TABLE IF EXISTS {quote_ident(TARGET_TABLE)}")
+    conn.execute(
+        f"CREATE TABLE {quote_ident(TARGET_TABLE)} (\n    "
+        + ",\n    ".join(base_defs + diff_defs)
+        + "\n)"
+    )
+
+    partition_expr = ", ".join(f"u.{quote_ident(c)}" for c in partition_cols)
+    order_expr = f"date(u.{quote_ident(date_col)})"
+
+    select_exprs = [f"u.{quote_ident(c.name)}" for c in columns]
+    for name in COMPARE_COLUMNS:
+        q_name = quote_ident(name)
+        q_diff = quote_ident(f"{name}_diff")
+        select_exprs.append(
+            "CASE "
+            f"WHEN u.{q_name} IS NULL OR LAG(u.{q_name}) OVER (PARTITION BY {partition_expr} ORDER BY {order_expr}) IS NULL THEN NULL "
+            f"ELSE CAST(u.{q_name} AS INTEGER) - CAST(LAG(u.{q_name}) OVER (PARTITION BY {partition_expr} ORDER BY {order_expr}) AS INTEGER) "
+            f"END AS {q_diff}"
+        )
+
+    insert_sql = (
+        f"INSERT INTO {quote_ident(TARGET_TABLE)}\n"
+        "SELECT\n    "
+        + ",\n    ".join(select_exprs)
+        + f"\nFROM {quote_ident('src')}.{quote_ident(SOURCE_TABLE)} u"
+    )
+
+    cur = conn.execute(insert_sql)
+    return cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
 
 
 def main() -> None:
-	with sqlite3.connect(DB_PATH) as conn:
-		date_col = detect_date_column(conn)
-		stored = store_daily_diffs(conn, date_col)
+    TARGET_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-		overall_avg = fetch_avg_diff_overall(conn, date_col)
-		daily_avgs = fetch_avg_diff_by_day(conn, date_col)
+    with sqlite3.connect(TARGET_DB_PATH) as conn:
+        conn.execute(f"ATTACH DATABASE {str(SOURCE_DB_PATH)!r} AS {quote_ident('src')}")
+        inserted_rows = create_compare_table(conn)
+        conn.commit()
+        conn.execute(f"DETACH DATABASE {quote_ident('src')}")
 
-	if overall_avg is None:
-		print("No day-over-day comparisons available.")
-		return
-
-	print("Average day-over-day change (completedOrderNumOfLatest30day):")
-	print(f"Overall average: {overall_avg:.2f}")
-	print("\nDaily averages:")
-	for day, avg_diff, sample_count in daily_avgs:
-		print(f"{day}: avg_diff={avg_diff:.2f} (n={sample_count})")
-
-	print(f"\nStored diffs in user_info_diffs: {stored}")
+    print("Created compare table in compare.db from user_info.")
+    print("Added diff columns: completedOrderNum_diff, completedBuyOrderNum_diff, completedSellOrderNum_diff")
+    print(f"Inserted {inserted_rows} rows")
 
 
 if __name__ == "__main__":
-	main()
+    main()
