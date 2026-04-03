@@ -1,8 +1,3 @@
--- Clean up old tables if they exist
-DROP TABLE IF EXISTS user_info_old;
-DROP TABLE IF EXISTS sell_ads_old;
-DROP TABLE IF EXISTS buy_ads_old;
-
 -- Migrate user_info
 ALTER TABLE user_info RENAME TO user_info_old;
 

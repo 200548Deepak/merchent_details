@@ -7,6 +7,7 @@ from flask import Flask, render_template_string, request
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "merch_details.db"
+COMPARE_DB_PATH = BASE_DIR / "compare.db"
 ALLOWED_TABLES = ["user_info", "sell_ads", "buy_ads"]
 
 app = Flask(__name__)
@@ -41,6 +42,7 @@ TEMPLATE = """
 </head>
 <body>
   <h1>Merchant Details Dashboard</h1>
+  <p><a href="/compare">Open Compare Dashboard</a></p>
 
   <div class="card">
     <form method="get">
@@ -165,6 +167,163 @@ TEMPLATE = """
 """
 
 
+COMPARE_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Compare Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; background: #f8fafc; color: #0f172a; }
+    h1 { margin: 0 0 16px; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+    .field { display: flex; flex-direction: column; min-width: 140px; }
+    label { font-size: 12px; color: #475569; margin-bottom: 4px; font-weight: 600; }
+    input, select, button { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+    button { cursor: pointer; background: #2563eb; color: white; border: none; }
+    button:hover { background: #1d4ed8; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
+    th { background: #f1f5f9; position: sticky; top: 0; }
+    .table-wrap { max-height: 60vh; overflow: auto; }
+    .muted { color: #64748b; font-size: 12px; }
+    .error { color: #b91c1c; font-weight: 600; }
+    .split { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 1000px) {
+      .split { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Compare Dashboard</h1>
+  <p><a href="/">Back to Merchant Dashboard</a></p>
+
+  <div class="card">
+    <form method="get">
+      <div class="row">
+        <div class="field">
+          <label for="user_no">User No</label>
+          <input id="user_no" name="user_no" value="{{ filters.user_no }}" placeholder="Search userNo" />
+        </div>
+
+        <div class="field">
+          <label for="date_from">From Date</label>
+          <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" />
+        </div>
+
+        <div class="field">
+          <label for="date_to">To Date</label>
+          <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" />
+        </div>
+
+        <div class="field">
+          <label for="limit">Rows Limit</label>
+          <input id="limit" type="number" min="1" max="1000" name="limit" value="{{ filters.limit }}" />
+        </div>
+
+        <div class="field">
+          <label for="leaderboard_limit">Leaderboard Top</label>
+          <input id="leaderboard_limit" type="number" min="1" max="100" name="leaderboard_limit" value="{{ filters.leaderboard_limit }}" />
+        </div>
+
+        <div class="field">
+          <button type="submit">Apply Filters</button>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <div class="field">
+          <label for="col_name">Column Filter</label>
+          <select id="col_name" name="col_name">
+            <option value="">-- Select Column --</option>
+            {% for col in all_columns %}
+              <option value="{{ col }}" {% if col == filters.col_name %}selected{% endif %}>{{ col }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="col_op">Operator</label>
+          <select id="col_op" name="col_op">
+            <option value="=" {% if filters.col_op == "=" %}selected{% endif %}>=</option>
+            <option value="LIKE" {% if filters.col_op == "LIKE" %}selected{% endif %}>Contains</option>
+            <option value=">" {% if filters.col_op == ">" %}selected{% endif %}>&gt;</option>
+            <option value="<" {% if filters.col_op == "<" %}selected{% endif %}>&lt;</option>
+            <option value=">=" {% if filters.col_op == ">=" %}selected{% endif %}>&gt;=</option>
+            <option value="<=" {% if filters.col_op == "<=" %}selected{% endif %}>&lt;=</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="col_val">Value</label>
+          <input id="col_val" name="col_val" value="{{ filters.col_val }}" placeholder="Filter value" />
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {% if error %}
+    <div class="card error">{{ error }}</div>
+  {% else %}
+    <div class="split">
+      <div class="card">
+        <h3>Top Users by completedOrderNum_diff (Latest Date)</h3>
+        <p class="muted">Computed per user from the latest date available in compare.db.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>User No</th>
+                <th>Total completedOrderNum_diff</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in leaderboard_rows %}
+                <tr>
+                  <td>{{ loop.index }}</td>
+                  <td>{{ row[0] }}</td>
+                  <td>{{ row[1] }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Compare Table Preview</h3>
+        <p class="muted"><b>Rows shown:</b> {{ row_count }}</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                {% for col in columns %}
+                  <th>{{ col }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+                <tr>
+                  {% for value in row %}
+                    <td>{{ value }}</td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</body>
+</html>
+"""
+
+
 def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -199,6 +358,36 @@ def sanitize_filters(args: Dict[str, str]) -> Dict[str, str]:
         "last_active_from": args.get("last_active_from", "").strip(),
         "last_active_to": args.get("last_active_to", "").strip(),
         "limit": limit,
+        "col_name": args.get("col_name", "").strip(),
+        "col_op": col_op,
+        "col_val": args.get("col_val", "").strip(),
+    }
+
+
+def sanitize_compare_filters(args: Dict[str, str]) -> Dict[str, str]:
+    limit_str = args.get("limit", "100").strip()
+    leaderboard_limit_str = args.get("leaderboard_limit", "20").strip()
+
+    try:
+        limit = str(max(1, min(int(limit_str), 1000)))
+    except ValueError:
+        limit = "100"
+
+    try:
+        leaderboard_limit = str(max(1, min(int(leaderboard_limit_str), 100)))
+    except ValueError:
+        leaderboard_limit = "20"
+
+    col_op = args.get("col_op", "=").strip()
+    if col_op not in ["=", "LIKE", ">", "<", ">=", "<="]:
+        col_op = "="
+
+    return {
+        "user_no": args.get("user_no", "").strip(),
+        "date_from": args.get("date_from", "").strip(),
+        "date_to": args.get("date_to", "").strip(),
+        "limit": limit,
+        "leaderboard_limit": leaderboard_limit,
         "col_name": args.get("col_name", "").strip(),
         "col_op": col_op,
         "col_val": args.get("col_val", "").strip(),
@@ -297,6 +486,87 @@ def build_query(table_name: str, columns: List[str], filters: Dict[str, str]) ->
     return sql, params
 
 
+def build_compare_query(columns: List[str], filters: Dict[str, str]) -> Tuple[str, List[object]]:
+    table_name = "compare"
+    where_clauses = []
+    params: List[object] = []
+
+    if "userNo" in columns and filters["user_no"]:
+        where_clauses.append("userNo LIKE ?")
+        params.append(f"%{filters['user_no']}%")
+
+    if "date" in columns and filters["date_from"]:
+        where_clauses.append("date(date) >= date(?)")
+        params.append(filters["date_from"])
+
+    if "date" in columns and filters["date_to"]:
+        where_clauses.append("date(date) <= date(?)")
+        params.append(filters["date_to"])
+
+    if filters["col_name"] and filters["col_val"]:
+        col_name = filters["col_name"]
+        if col_name in columns:
+            operator = filters["col_op"]
+            col_val = filters["col_val"]
+
+            if operator in ["=", "LIKE"]:
+                where_clauses.append(f"{col_name} LIKE ?")
+                params.append(f"%{col_val}%")
+            else:
+                try:
+                    numeric_val = float(col_val)
+                except ValueError:
+                    numeric_val = None
+
+                if numeric_val is not None:
+                    where_clauses.append(f"CAST({col_name} AS REAL) {operator} ?")
+                    params.append(numeric_val)
+
+    sql = f"SELECT * FROM {table_name}"
+    if where_clauses:
+        sql += " WHERE " + " AND ".join(where_clauses)
+
+    if "date" in columns:
+        sql += " ORDER BY date DESC"
+    else:
+        sql += " ORDER BY rowid DESC"
+
+    sql += " LIMIT ?"
+    params.append(filters["limit"])
+    return sql, params
+
+
+def fetch_compare_leaderboard(
+  conn: sqlite3.Connection,
+  columns: List[str],
+  leaderboard_limit: int,
+) -> List[Tuple]:
+  if "userNo" not in columns:
+    return []
+
+  if "completedOrderNum_diff" not in columns:
+    return []
+
+  query = """
+    WITH latest_day AS (
+      SELECT MAX(date(date)) AS day
+      FROM compare
+      WHERE date IS NOT NULL
+    )
+    SELECT
+      c.userNo,
+      ROUND(SUM(COALESCE(CAST(c.completedOrderNum_diff AS REAL), 0)), 2) AS total_completedordernum_diff
+    FROM compare c
+    JOIN latest_day ld ON date(c.date) = ld.day
+    WHERE c.userNo IS NOT NULL
+      AND TRIM(c.userNo) <> ''
+    GROUP BY c.userNo
+    ORDER BY total_completedordernum_diff DESC
+    LIMIT ?
+  """
+  return conn.execute(query, (leaderboard_limit,)).fetchall()
+
+
 def format_epoch_ms_time_columns(columns: List[str], rows: List[Tuple]) -> List[Tuple]:
     # Fields stored as epoch milliseconds that should be displayed in IST.
     epoch_ms_fields = {"lastactivetime", "adcreatedtime", "adupdatedtime"}
@@ -385,6 +655,55 @@ def dashboard():
         error=error,
         query_executed=query_executed,
         query_params=query_params,
+    )
+
+
+@app.route("/compare")
+def compare_dashboard():
+    filters = sanitize_compare_filters(request.args)
+
+    if not COMPARE_DB_PATH.exists():
+        return f"Database not found: {COMPARE_DB_PATH}", 404
+
+    error = ""
+    columns: List[str] = []
+    all_columns: List[str] = []
+    rows: List[Tuple] = []
+    row_count = 0
+    leaderboard_rows: List[Tuple] = []
+
+    try:
+        with sqlite3.connect(COMPARE_DB_PATH) as conn:
+            columns = get_table_columns(conn, "compare")
+            all_columns = columns
+
+            if not columns:
+                raise ValueError("Table 'compare' not found in compare.db")
+
+            query, params = build_compare_query(columns, filters)
+            result = conn.execute(query, params).fetchall()
+            rows = [tuple(r) for r in result]
+            rows = format_epoch_ms_time_columns(columns, rows)
+            row_count = len(rows)
+
+            leaderboard_rows = fetch_compare_leaderboard(
+                conn,
+                columns,
+                int(filters["leaderboard_limit"]),
+            )
+
+    except Exception as exc:
+        error = str(exc)
+
+    return render_template_string(
+        COMPARE_TEMPLATE,
+        filters=filters,
+        columns=columns,
+        all_columns=all_columns,
+        rows=rows,
+        row_count=row_count,
+        leaderboard_rows=leaderboard_rows,
+        error=error,
     )
 
 
