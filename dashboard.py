@@ -308,6 +308,7 @@ COMPARE_TEMPLATE = """
               <tr>
                 <th>Rank</th>
                 <th>User No</th>
+                <th>Nickname</th>
                 <th>Total completedOrderNum_diff</th>
               </tr>
             </thead>
@@ -317,6 +318,7 @@ COMPARE_TEMPLATE = """
                   <td>{{ loop.index }}</td>
                   <td>{{ row[0] }}</td>
                   <td>{{ row[1] }}</td>
+                  <td>{{ row[2] }}</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -594,7 +596,9 @@ def fetch_compare_leaderboard(
   if "completedOrderNum_diff" not in columns:
     return []
 
-  query = """
+  nickname_select = "MAX(COALESCE(c.nickName, '')) AS nickname" if "nickName" in columns else "'' AS nickname"
+
+  query = f"""
     WITH latest_day AS (
       SELECT MAX(date(date)) AS day
       FROM compare
@@ -602,6 +606,7 @@ def fetch_compare_leaderboard(
     )
     SELECT
       c.userNo,
+      {nickname_select},
       ROUND(SUM(COALESCE(CAST(c.completedOrderNum_diff AS REAL), 0)), 2) AS total_completedordernum_diff
     FROM compare c
     JOIN latest_day ld ON date(c.date) = ld.day
