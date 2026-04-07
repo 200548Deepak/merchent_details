@@ -25,3 +25,8 @@ nohup: ignoring input
 49.37.241.108 - - [07/Apr/2026 21:59:54] "GET /compare?user_no=s03e06644e01738b3994570048e4c68be&date_from=&date_to=&limit=100&leaderboard_limit=20&col_name=&col_op=%3D&col_val=&visible_columns=userNo&visible_columns=completedOrderNum&visible_columns=date&visible_columns=completedOrderNum_diff&visible_columns=completedBuyOrderNum_diff&visible_columns=completedSellOrderNum_diff HTTP/1.1" 200 -
 49.37.241.108 - - [07/Apr/2026 22:00:06] "GET /compare?user_no=s03e06644e01738b3994570048e4c68be&date_from=&date_to=&limit=100&leaderboard_limit=25&col_name=&col_op=%3D&col_val=&visible_columns=userNo&visible_columns=completedOrderNum&visible_columns=date&visible_columns=completedOrderNum_diff&visible_columns=completedBuyOrderNum_diff&visible_columns=completedSellOrderNum_diff HTTP/1.1" 200 -
 54.165.95.100 - - [07/Apr/2026 22:24:32] "GET / HTTP/1.1" 200 -
+49.37.241.108 - - [07/Apr/2026 22:41:27] "GET /compare?user_no=s03e06644e01738b3994570048e4c68be&date_from=&date_to=&limit=100&leaderboard_limit=25&col_name=&col_op=%3D&col_val=&visible_columns=userNo&visible_columns=completedOrderNum&visible_columns=date&visible_columns=completedOrderNum_diff&visible_columns=completedBuyOrderNum_diff&visible_columns=completedSellOrderNum_diff HTTP/1.1" 200 -
+ * Detected change in '/home/ubuntu/merchent_details/merch_details.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 552-680-930
