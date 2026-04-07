@@ -20,6 +20,7 @@ def merch_detail(user_name):
         # Extract user info fields
         user_info = {
             "userNo": user_detail.get("userNo"),
+            "nickName": user_detail.get("nickName"),
             "registerDays": user_stats.get("registerDays"),
             "firstOrderDays": user_stats.get("firstOrderDays"),
             "avgReleaseTimeOfLatest30day": user_stats.get("avgReleaseTimeOfLatest30day"),
@@ -123,6 +124,7 @@ def save_to_sqlite(user_info, sell_data, buy_data):
             CREATE TABLE IF NOT EXISTS user_info (
                 id INTEGER,
                 userNo TEXT,
+                nickName TEXT,
                 registerDays INTEGER,
                 firstOrderDays INTEGER,
                 avgReleaseTimeOfLatest30day REAL,
@@ -204,6 +206,12 @@ def save_to_sqlite(user_info, sell_data, buy_data):
                 cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN adCreatedTime INTEGER")
             if "adUpdatedTime" not in existing_columns:
                 cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN adUpdatedTime INTEGER")
+
+        # Backward-compatible migration for existing databases missing nickName.
+        cursor.execute("PRAGMA table_info(user_info)")
+        user_info_columns = {row[1] for row in cursor.fetchall()}
+        if "nickName" not in user_info_columns:
+            cursor.execute("ALTER TABLE user_info ADD COLUMN nickName TEXT")
         
         # Insert user info with today's date
         now_ist = datetime.now(IST)
@@ -212,14 +220,15 @@ def save_to_sqlite(user_info, sell_data, buy_data):
         try:
             cursor.execute("""
                 INSERT INTO user_info 
-                (userNo, registerDays, firstOrderDays, avgReleaseTimeOfLatest30day, avgPayTimeOfLatest30day, 
+                (userNo, nickName, registerDays, firstOrderDays, avgReleaseTimeOfLatest30day, avgPayTimeOfLatest30day, 
                  finishRateLatest30day, completedOrderNumOfLatest30day, completedBuyOrderNumOfLatest30day, 
                  completedSellOrderNumOfLatest30day, completedOrderNum, completedBuyOrderNum, 
                  completedSellOrderNum, counterpartyCount, userIdentity, badges, vipLevel, 
                  lastActiveTime, isCompanyAccount, created_at, date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 user_info["userNo"],
+                user_info["nickName"],
                 user_info["registerDays"],
                 user_info["firstOrderDays"],
                 user_info["avgReleaseTimeOfLatest30day"],
@@ -245,13 +254,14 @@ def save_to_sqlite(user_info, sell_data, buy_data):
             print(f"User data for {current_date} already exists in database, updating...")
             cursor.execute("""
                 UPDATE user_info SET 
-                registerDays=?, firstOrderDays=?, avgReleaseTimeOfLatest30day=?, avgPayTimeOfLatest30day=?,
+                nickName=?, registerDays=?, firstOrderDays=?, avgReleaseTimeOfLatest30day=?, avgPayTimeOfLatest30day=?,
                 finishRateLatest30day=?, completedOrderNumOfLatest30day=?, completedBuyOrderNumOfLatest30day=?,
                 completedSellOrderNumOfLatest30day=?, completedOrderNum=?, completedBuyOrderNum=?,
                 completedSellOrderNum=?, counterpartyCount=?, userIdentity=?, badges=?, vipLevel=?,
                 lastActiveTime=?, isCompanyAccount=?
                 WHERE userNo=? AND date=?
             """, (
+                user_info["nickName"],
                 user_info["registerDays"],
                 user_info["firstOrderDays"],
                 user_info["avgReleaseTimeOfLatest30day"],
