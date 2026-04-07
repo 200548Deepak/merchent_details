@@ -30,3 +30,15 @@ nohup: ignoring input
  * Restarting with stat
  * Debugger is active!
  * Debugger PIN: 552-680-930
+49.37.241.108 - - [07/Apr/2026 22:48:06] "GET /compare?user_no=s03e06644e01738b3994570048e4c68be&date_from=&date_to=&limit=100&leaderboard_limit=25&col_name=&col_op=%3D&col_val=&visible_columns=userNo&visible_columns=completedOrderNum&visible_columns=date&visible_columns=completedOrderNum_diff&visible_columns=completedBuyOrderNum_diff&visible_columns=completedSellOrderNum_diff HTTP/1.1" 200 -
+ * Detected change in '/home/ubuntu/merchent_details/dashboard.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 552-680-930
+49.37.241.108 - - [07/Apr/2026 22:50:21] "GET /compare?user_no=s03e06644e01738b3994570048e4c68be&date_from=&date_to=&limit=100&leaderboard_limit=25&col_name=&col_op=%3D&col_val=&visible_columns=userNo&visible_columns=completedOrderNum&visible_columns=date&visible_columns=completedOrderNum_diff&visible_columns=completedBuyOrderNum_diff&visible_columns=completedSellOrderNum_diff HTTP/1.1" 200 -
+49.37.241.108 - - [07/Apr/2026 22:50:35] "GET /compare?user_no=s019107e25efc336e9af611c0bcd6fed3&date_from=&date_to=&limit=100&leaderboard_limit=25&col_name=&col_op=%3D&col_val=&visible_columns=userNo&visible_columns=completedOrderNum&visible_columns=date&visible_columns=completedOrderNum_diff&visible_columns=completedBuyOrderNum_diff&visible_columns=completedSellOrderNum_diff HTTP/1.1" 200 -
+49.37.241.108 - - [07/Apr/2026 22:51:00] "GET /compare?user_no=s019107e25efc336e9af611c0bcd6fed3&date_from=&date_to=&limit=100&leaderboard_limit=25&col_name=&col_op=%3D&col_val=&visible_columns=userNo&visible_columns=completedOrderNum&visible_columns=date&visible_columns=completedOrderNum_diff&visible_columns=completedBuyOrderNum_diff&visible_columns=completedSellOrderNum_diff HTTP/1.1" 200 -
+49.37.241.108 - - [07/Apr/2026 22:51:13] "GET /compare HTTP/1.1" 200 -
+49.37.241.108 - - [07/Apr/2026 22:51:25] "GET /compare HTTP/1.1" 200 -
+49.37.241.108 - - [07/Apr/2026 22:53:03] "GET /compare HTTP/1.1" 200 -
+49.37.241.108 - - [07/Apr/2026 22:53:09] "GET /compare?user_no=s9e9fc49081983c3a9adbbcf176452897&date_from=&date_to=&limit=100&leaderboard_limit=20&col_name=&col_op=%3D&col_val=&visible_columns=id&visible_columns=userNo&visible_columns=registerDays&visible_columns=firstOrderDays&visible_columns=avgReleaseTimeOfLatest30day&visible_columns=avgPayTimeOfLatest30day&visible_columns=finishRateLatest30day&visible_columns=completedOrderNumOfLatest30day&visible_columns=completedBuyOrderNumOfLatest30day&visible_columns=completedSellOrderNumOfLatest30day&visible_columns=completedOrderNum&visible_columns=completedBuyOrderNum&visible_columns=completedSellOrderNum&visible_columns=counterpartyCount&visible_columns=userIdentity&visible_columns=badges&visible_columns=vipLevel&visible_columns=lastActiveTime&visible_columns=isCompanyAccount&visible_columns=created_at&visible_columns=date&visible_columns=completedOrderNum_diff&visible_columns=completedBuyOrderNum_diff&visible_columns=completedSellOrderNum_diff HTTP/1.1" 200 -
