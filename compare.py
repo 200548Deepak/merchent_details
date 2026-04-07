@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Sequence
 
-SOURCE_DB_PATH = Path(r"E:\Deepak\Work\merchent_details\merch_details.db")
-TARGET_DB_PATH = Path(r"E:\Deepak\Work\merchent_details\compare.db")
+SOURCE_DB_PATH = Path(r"/home/ubuntu/merchent_details/merch_details.db")
+TARGET_DB_PATH = Path(r"/home/ubuntu/merchent_details/compare.db")
 SOURCE_TABLE = "user_info"
 TARGET_TABLE = "compare"
 
