@@ -191,6 +191,14 @@ COMPARE_TEMPLATE = """
     .muted { color: #64748b; font-size: 12px; }
     .error { color: #b91c1c; font-weight: 600; }
     .split { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .column-toggle-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+    .secondary-button { background: #e2e8f0; color: #0f172a; }
+    .secondary-button:hover { background: #cbd5e1; }
+    .column-panel { margin-top: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; display: none; }
+    .column-panel.open { display: block; }
+    .checkbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; margin-top: 8px; }
+    .checkbox-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #0f172a; }
+    .checkbox-item input { margin: 0; }
     @media (min-width: 1000px) {
       .split { grid-template-columns: 1fr 1fr; }
     }
@@ -261,6 +269,29 @@ COMPARE_TEMPLATE = """
           <input id="col_val" name="col_val" value="{{ filters.col_val }}" placeholder="Filter value" />
         </div>
       </div>
+
+      <div class="column-toggle-row">
+        <button type="button" class="secondary-button" onclick="toggleColumnPanel()">Choose Visible Columns</button>
+        <span class="muted">Use the checkboxes below to show or hide columns in the compare table.</span>
+      </div>
+
+      <div id="columnPanel" class="column-panel {% if column_panel_open %}open{% endif %}">
+        <div class="row" style="align-items:center; justify-content: space-between;">
+          <div>
+            <b>Visible Columns</b>
+            <div class="muted">Leave at least one column selected to keep the preview useful.</div>
+          </div>
+          <button type="submit">Apply Column Selection</button>
+        </div>
+        <div class="checkbox-grid">
+          {% for col in all_columns %}
+            <label class="checkbox-item">
+              <input type="checkbox" name="visible_columns" value="{{ col }}" {% if col in selected_columns %}checked{% endif %} />
+              <span>{{ col }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
     </form>
   </div>
 
@@ -319,6 +350,14 @@ COMPARE_TEMPLATE = """
       </div>
     </div>
   {% endif %}
+  <script>
+    function toggleColumnPanel() {
+      const panel = document.getElementById('columnPanel');
+      if (panel) {
+        panel.classList.toggle('open');
+      }
+    }
+  </script>
 </body>
 </html>
 """
@@ -392,6 +431,14 @@ def sanitize_compare_filters(args: Dict[str, str]) -> Dict[str, str]:
         "col_op": col_op,
         "col_val": args.get("col_val", "").strip(),
     }
+
+
+def select_visible_columns(all_columns: List[str], requested_columns: List[str]) -> List[str]:
+    requested_set = {column for column in requested_columns if column in all_columns}
+    if not requested_set:
+        return list(all_columns)
+
+    return [column for column in all_columns if column in requested_set]
 
 
 def parse_ist_datetime_to_epoch_ms(value: str, end_of_range: bool = False) -> Optional[int]:
@@ -600,6 +647,17 @@ def format_epoch_ms_time_columns(columns: List[str], rows: List[Tuple]) -> List[
     return formatted_rows
 
 
+def project_rows(columns: List[str], rows: List[Tuple], visible_columns: List[str]) -> List[Tuple]:
+    if visible_columns == columns:
+        return rows
+
+    column_indexes = [columns.index(column) for column in visible_columns if column in columns]
+    if not column_indexes:
+        return rows
+
+    return [tuple(row[index] for index in column_indexes) for row in rows]
+
+
 @app.route("/")
 def dashboard():
     filters = sanitize_filters(request.args)
@@ -668,6 +726,7 @@ def compare_dashboard():
     error = ""
     columns: List[str] = []
     all_columns: List[str] = []
+    selected_columns: List[str] = []
     rows: List[Tuple] = []
     row_count = 0
     leaderboard_rows: List[Tuple] = []
@@ -676,6 +735,7 @@ def compare_dashboard():
         with sqlite3.connect(COMPARE_DB_PATH) as conn:
             columns = get_table_columns(conn, "compare")
             all_columns = columns
+            selected_columns = select_visible_columns(columns, request.args.getlist("visible_columns"))
 
             if not columns:
                 raise ValueError("Table 'compare' not found in compare.db")
@@ -684,6 +744,7 @@ def compare_dashboard():
             result = conn.execute(query, params).fetchall()
             rows = [tuple(r) for r in result]
             rows = format_epoch_ms_time_columns(columns, rows)
+            rows = project_rows(columns, rows, selected_columns)
             row_count = len(rows)
 
             leaderboard_rows = fetch_compare_leaderboard(
@@ -698,12 +759,14 @@ def compare_dashboard():
     return render_template_string(
         COMPARE_TEMPLATE,
         filters=filters,
-        columns=columns,
+        columns=selected_columns,
         all_columns=all_columns,
+        selected_columns=selected_columns,
         rows=rows,
         row_count=row_count,
         leaderboard_rows=leaderboard_rows,
         error=error,
+        column_panel_open=bool(request.args.getlist("visible_columns")),
     )
 
 
