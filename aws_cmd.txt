@@ -17,3 +17,17 @@ pkill -f fetch2.py
 
 (To ome out of virtual environment)
 deactivate
+
+
+#################################################################################################
+for dashboard.py
+#################################################################################################
+
+(to run in background)
+nohup /home/ubuntu/binance/bin/python3 dashboard.py > dashboard.log 2>&1 &
+
+(To check weather the dashboard.py is running)
+ps aux | grep dashboard.py
+
+(To stop the process)
+pkill -f dashboard.py
