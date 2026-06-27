@@ -1,14 +1,14 @@
 ( for virtual environment )
-source ~/binance/bin/activate
+source venv/bin/activate
 
 (to move to your merchent_details folder )
 cd merchent_details
 
 (to run in background)
-nohup python3 fetch2.py > /dev/null 2>&1 &
+nohup /home/ubuntu/merchent_details/venv/bin/python3 fetch2.py > fetch2.log 2>&1 &
 
 (To check weather the fetch.py is running)
-pgrep -af fetch2.py
+ps aux | grep "[f]etch2.py"
 or
 top
 
@@ -24,7 +24,7 @@ for dashboard.py
 #################################################################################################
 
 (to run in background)
-nohup /home/ubuntu/binance/bin/python3 dashboard.py > dashboard.log 2>&1 &
+nohup python3 dashboard.py > dashboard.log 2>&1 &
 
 (To check weather the dashboard.py is running)
 ps aux | grep dashboard.py
