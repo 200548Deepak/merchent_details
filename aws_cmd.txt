@@ -17,3 +17,6 @@ pkill -f fetch2.py
 
 (To ome out of virtual environment)
 deactivate
+
+(push without .db and log files)
+git restore --staged *.db *.log
