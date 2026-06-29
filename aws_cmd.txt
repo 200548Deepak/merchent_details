@@ -31,3 +31,14 @@ ps aux | grep dashboard.py
 
 (To stop the process)
 pkill -f dashboard.py
+
+
+(To download db files)[RUN in gitbash]
+
+scp -i "/e/Deepak/Work/AWS/cloud200548.pem" \
+ubuntu@13.201.32.179:/home/ubuntu/merchent_details/merch_details.db \
+/e/Deepak/Work/merchent_details/
+
+scp -i "/e/Deepak/Work/AWS/cloud200548.pem" \
+ubuntu@13.201.32.179:/home/ubuntu/merchent_details/binance_merch.db \
+/e/Deepak/Work/merchent_details/

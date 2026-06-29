@@ -1280,24 +1280,28 @@ COMPARE_TEMPLATE = """
 
     /* Scrollbars */
     .table-responsive::-webkit-scrollbar,
-    .column-panel::-webkit-scrollbar {
+    .column-panel::-webkit-scrollbar,
+    .leaderboard-table-container::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
 
     .table-responsive::-webkit-scrollbar-track,
-    .column-panel::-webkit-scrollbar-track {
+    .column-panel::-webkit-scrollbar-track,
+    .leaderboard-table-container::-webkit-scrollbar-track {
       background: transparent;
     }
 
     .table-responsive::-webkit-scrollbar-thumb,
-    .column-panel::-webkit-scrollbar-thumb {
+    .column-panel::-webkit-scrollbar-thumb,
+    .leaderboard-table-container::-webkit-scrollbar-thumb {
       background: rgba(255, 255, 255, 0.15);
       border-radius: 10px;
     }
 
     .table-responsive::-webkit-scrollbar-thumb:hover,
-    .column-panel::-webkit-scrollbar-thumb:hover {
+    .column-panel::-webkit-scrollbar-thumb:hover,
+    .leaderboard-table-container::-webkit-scrollbar-thumb:hover {
       background: rgba(255, 255, 255, 0.3);
     }
 
@@ -1388,16 +1392,66 @@ COMPARE_TEMPLATE = """
     }
 
     /* Split layout */
-    .split-layout {
+    .dashboard-layout {
       display: grid;
       grid-template-columns: 1fr;
       gap: 24px;
     }
 
     @media (min-width: 1100px) {
-      .split-layout {
-        grid-template-columns: 380px 1fr;
+      .dashboard-layout {
+        grid-template-columns: minmax(0, 1fr) 420px;
+        align-items: start;
       }
+    }
+
+    .left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .right-column {
+      position: sticky;
+      top: 80px;
+    }
+
+    .leaderboard-table-container {
+      overflow-x: hidden !important;
+    }
+
+    .leaderboard-table-container th,
+    .leaderboard-table-container td {
+      padding: 10px 8px !important;
+      font-size: 12px;
+    }
+
+    .leaderboard-table-container table {
+      width: 100%;
+      table-layout: fixed;
+    }
+
+    .leaderboard-table-container th:nth-child(1),
+    .leaderboard-table-container td:nth-child(1) {
+      width: 45px;
+      text-align: center;
+    }
+
+    .leaderboard-table-container th:nth-child(2),
+    .leaderboard-table-container td:nth-child(2) {
+      width: auto;
+    }
+
+    .leaderboard-table-container th:nth-child(3),
+    .leaderboard-table-container td:nth-child(3) {
+      width: 90px;
+      text-align: right;
+    }
+
+    .leaderboard-table-container th:nth-child(4),
+    .leaderboard-table-container td:nth-child(4) {
+      width: 95px;
+      text-align: right;
     }
 
     .rank-cell {
@@ -1415,6 +1469,76 @@ COMPARE_TEMPLATE = """
     .rank-2 { background: linear-gradient(135deg, #cbd5e1 0%, #64748b 100%); color: #fff; box-shadow: 0 2px 8px rgba(203, 213, 225, 0.4); }
     .rank-3 { background: linear-gradient(135deg, #b45309 0%, #78350f 100%); color: #fff; box-shadow: 0 2px 8px rgba(180, 83, 9, 0.4); }
     .rank-other { background: rgba(255, 255, 255, 0.05); color: var(--text-muted); border: 1px solid var(--border-muted); }
+
+    /* Stats Grid */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .stat-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-muted);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--accent-gradient);
+    }
+
+    .stat-icon {
+      font-size: 22px;
+      width: 46px;
+      height: 46px;
+      background: rgba(99, 102, 241, 0.1);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-primary);
+    }
+
+    .stat-content {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    /* Make right section longer */
+    .leaderboard-table-container {
+      max-height: 80vh;
+      overflow-y: auto;
+    }
 
     /* Error alert */
     .error-card {
@@ -1497,183 +1621,229 @@ COMPARE_TEMPLATE = """
       </div>
     {% endif %}
 
-    <div class="glass-card">
-      <div class="card-title">🔍 Comparison Filters</div>
-      <form method="get" class="filters-form">
-        <div class="filter-grid-primary">
-          <div class="input-wrapper">
-            <label for="user_no">User ID</label>
-            <input id="user_no" name="user_no" value="{{ filters.user_no }}" placeholder="Filter userNo" />
-          </div>
-
-          <div class="input-wrapper">
-            <label for="date_from">From Date</label>
-            <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" />
-          </div>
-
-          <div class="input-wrapper">
-            <label for="date_to">To Date</label>
-            <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" />
-          </div>
-
-          <div class="input-wrapper">
-            <label for="limit">Preview Limit</label>
-            <input id="limit" type="number" min="1" max="1000" name="limit" value="{{ filters.limit }}" />
-          </div>
-
-          <div class="input-wrapper">
-            <label for="leaderboard_limit">Leaderboard Limit</label>
-            <input id="leaderboard_limit" type="number" min="1" max="100" name="leaderboard_limit" value="{{ filters.leaderboard_limit }}" />
-          </div>
-        </div>
-
-        <div class="filter-grid-secondary">
-          <div class="input-wrapper">
-            <label for="col_name">Column filter</label>
-            <select id="col_name" name="col_name">
-              <option value="">-- Choose Column --</option>
-              {% for col in all_columns %}
-                <option value="{{ col }}" {% if col == filters.col_name %}selected{% endif %}>{{ col }}</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div class="input-wrapper">
-            <label for="col_op">Operator</label>
-            <select id="col_op" name="col_op">
-              <option value="=" {% if filters.col_op == "=" %}selected{% endif %}>=</option>
-              <option value="LIKE" {% if filters.col_op == "LIKE" %}selected{% endif %}>Contains</option>
-              <option value=">" {% if filters.col_op == ">" %}selected{% endif %}>&gt;</option>
-              <option value="<" {% if filters.col_op == "<" %}selected{% endif %}>&lt;</option>
-              <option value=">=" {% if filters.col_op == ">=" %}selected{% endif %}>&gt;=</option>
-              <option value="<=" {% if filters.col_op == "<=" %}selected{% endif %}>&lt;=</option>
-            </select>
-          </div>
-
-          <div class="input-wrapper">
-            <label for="col_val">Filter Value</label>
-            <input id="col_val" name="col_val" value="{{ filters.col_val }}" placeholder="e.g. 10 or Active" />
-          </div>
-        </div>
-
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px; border-top: 1px dashed var(--border-muted); padding-top: 16px;">
-          <button type="button" class="btn btn-secondary" onclick="toggleColumnPanel()">Configure Table Columns</button>
-          <div style="display: flex; gap: 12px;">
-            <button type="button" class="btn btn-secondary" onclick="window.location.href='/compare'">Reset</button>
-            <button type="submit" class="btn btn-primary">Apply Queries</button>
-          </div>
-        </div>
-
-        <div id="columnPanel" class="column-panel {% if column_panel_open %}open{% endif %}">
-          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-muted); padding-bottom: 10px; margin-bottom: 10px;">
-            <div>
-              <strong style="font-size: 13px;">Visible Output Columns</strong>
-              <div style="font-size:11px; color: var(--text-muted); margin-top: 2px;">Deselected fields will be hidden in the Comparison preview table below.</div>
-            </div>
-            <button type="submit" class="btn btn-primary" style="padding: 6px 14px; font-size: 12px;">Apply Selected Columns</button>
-          </div>
-          <div class="checkbox-grid">
-            {% for col in all_columns %}
-              <label class="checkbox-item" title="{{ col }}">
-                <input type="checkbox" name="visible_columns" value="{{ col }}" {% if col in selected_columns %}checked{% endif %} />
-                <span>{{ col }}</span>
-              </label>
-            {% endfor %}
-          </div>
-        </div>
-      </form>
-    </div>
-
     {% if not error %}
-      <div class="split-layout">
-        <!-- Leaderboard Card -->
-        <div class="glass-card" style="padding: 16px;">
-          <div class="card-title" style="margin-bottom: 12px;">🏆 Leaderboard</div>
-          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
-            Top performing merchants based on order volume change (Latest snapshot run).
-          </div>
-          {% if leaderboard_rows %}
-            <div class="table-container" style="margin-top: 0;">
-              <div class="table-responsive" style="max-height: 55vh;">
-                <table>
-                  <thead>
-                    <tr>
-                      <th style="width: 50px; text-align: center;">Rank</th>
-                      <th>Merchant</th>
-                      <th style="text-align: right;">Diff</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for row in leaderboard_rows %}
-                      <tr>
-                        <td style="text-align: center;">
-                          <div class="rank-cell {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}rank-other{% endif %}">
-                            {{ loop.index }}
-                          </div>
-                        </td>
-                        <td>
-                          <div style="font-weight: 600;">{{ row[1] if row[1] else '—' }}</div>
-                          <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">ID: {{ row[0] }}</div>
-                        </td>
-                        <td style="text-align: right; font-weight: 700;">
-                          {% if row[2] > 0 %}
-                            <span class="badge badge-success">+{{ row[2]|round(0)|int }}</span>
-                          {% elif row[2] < 0 %}
-                            <span class="badge badge-danger">{{ row[2]|round(0)|int }}</span>
-                          {% else %}
-                            <span class="badge badge-neutral">0</span>
-                          {% endif %}
-                        </td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
+      <div class="dashboard-layout">
+        <!-- LEFT COLUMN: TOP LEFT & BOTTOM LEFT -->
+        <div class="left-column">
+          <!-- TOP LEFT: ACTIVE / TOTAL USERS & SELL VOLUME -->
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-icon">👥</div>
+              <div class="stat-content">
+                <span class="stat-label">Active / Total Users</span>
+                <span class="stat-value">{{ active_users }} / {{ total_users }}</span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                  Active = ≥1 trade in last 24h
+                </span>
               </div>
             </div>
-          {% else %}
-            <div style="text-align: center; padding: 24px; color: var(--text-muted);">
-              No leaderboard data. Make sure <code>completedOrderNum_diff</code> is populated.
-            </div>
-          {% endif %}
-        </div>
 
-        <!-- Table Preview -->
-        <div class="glass-card" style="padding: 16px;">
-          <div class="card-title" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <span>📋 Comparison Preview</span>
-            <span style="font-size:12px; color: var(--text-muted); font-weight: normal; text-transform: none;">Rows shown: {{ row_count }}</span>
+            <div class="stat-card">
+              <div class="stat-icon">📈</div>
+              <div class="stat-content">
+                <span class="stat-label">Sell Volume (Daily)</span>
+                <span class="stat-value" style="color: var(--color-success);">{{ "%.4f"|format(sell_volume_daily_cr) }} Cr</span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                  Value on {{ target_date }} (x1250)
+                </span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon">🗄️</div>
+              <div class="stat-content">
+                <span class="stat-label">Sell Volume (Cumulative)</span>
+                <span class="stat-value" style="color: var(--color-primary);">{{ "%.2f"|format(sell_volume_cum_cr) }} Cr</span>
+                <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                  Cumulative value (x1250)
+                </span>
+              </div>
+            </div>
           </div>
-          
-          {% if rows %}
-            <div class="table-container" style="margin-top: 0;">
-              <div class="table-responsive">
-                <table>
-                  <thead>
-                    <tr>
-                      {% for col in columns %}
-                        <th>{{ col }}</th>
-                      {% endfor %}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for row in rows %}
+
+          <!-- BOTTOM LEFT: FILTERS -->
+          <div class="glass-card" style="margin-bottom: 0;">
+            <div class="card-title">🔍 Comparison Filters</div>
+            <form method="get" class="filters-form">
+              <div class="filter-grid-primary">
+                <div class="input-wrapper">
+                  <label for="user_no">User ID</label>
+                  <input id="user_no" name="user_no" value="{{ filters.user_no }}" placeholder="Filter userNo" />
+                </div>
+
+                <div class="input-wrapper">
+                  <label for="limit">Preview Limit</label>
+                  <input id="limit" type="number" min="1" max="1000" name="limit" value="{{ filters.limit }}" />
+                </div>
+
+                <div class="input-wrapper">
+                  <label for="leaderboard_limit">Leaderboard Limit</label>
+                  <input id="leaderboard_limit" type="number" min="1" max="100" name="leaderboard_limit" value="{{ filters.leaderboard_limit }}" />
+                </div>
+              </div>
+
+              <div class="filter-grid-secondary">
+                <div class="input-wrapper">
+                  <label for="col_name">Column filter</label>
+                  <select id="col_name" name="col_name">
+                    <option value="">-- Choose Column --</option>
+                    {% for col in all_columns %}
+                      <option value="{{ col }}" {% if col == filters.col_name %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <div class="input-wrapper">
+                  <label for="col_op">Operator</label>
+                  <select id="col_op" name="col_op">
+                    <option value="=" {% if filters.col_op == "=" %}selected{% endif %}>=</option>
+                    <option value="LIKE" {% if filters.col_op == "LIKE" %}selected{% endif %}>Contains</option>
+                    <option value=">" {% if filters.col_op == ">" %}selected{% endif %}>&gt;</option>
+                    <option value="<" {% if filters.col_op == "<" %}selected{% endif %}>&lt;</option>
+                    <option value=">=" {% if filters.col_op == ">=" %}selected{% endif %}>&gt;=</option>
+                    <option value="<=" {% if filters.col_op == "<=" %}selected{% endif %}>&lt;=</option>
+                  </select>
+                </div>
+
+                <div class="input-wrapper">
+                  <label for="col_val">Filter Value</label>
+                  <input id="col_val" name="col_val" value="{{ filters.col_val }}" placeholder="e.g. 10 or Active" />
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px; border-top: 1px dashed var(--border-muted); padding-top: 16px;">
+                <button type="button" class="btn btn-secondary" onclick="toggleColumnPanel()">Configure Table Columns</button>
+                <div style="display: flex; gap: 12px;">
+                  <button type="button" class="btn btn-secondary" onclick="window.location.href='/compare'">Reset</button>
+                  <button type="submit" class="btn btn-primary">Apply Queries</button>
+                </div>
+              </div>
+
+              <div id="columnPanel" class="column-panel {% if column_panel_open %}open{% endif %}">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-muted); padding-bottom: 10px; margin-bottom: 10px;">
+                  <div>
+                    <strong style="font-size: 13px;">Visible Output Columns</strong>
+                    <div style="font-size:11px; color: var(--text-muted); margin-top: 2px;">Deselected fields will be hidden in the Comparison preview table below.</div>
+                  </div>
+                  <button type="submit" class="btn btn-primary" style="padding: 6px 14px; font-size: 12px;">Apply Selected Columns</button>
+                </div>
+                <div class="checkbox-grid">
+                  {% for col in all_columns %}
+                    <label class="checkbox-item" title="{{ col }}">
+                      <input type="checkbox" name="visible_columns" value="{{ col }}" {% if col in selected_columns %}checked{% endif %} />
+                      <span>{{ col }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- BOTTOM LEFT NEXT LINE: COMPARISON PREVIEW -->
+          <div class="glass-card" style="padding: 16px; margin-bottom: 0;">
+            <div class="card-title" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <span>📋 Comparison Preview</span>
+              <span style="font-size:12px; color: var(--text-muted); font-weight: normal; text-transform: none;">Rows shown: {{ row_count }}</span>
+            </div>
+            
+            {% if rows %}
+              <div class="table-container" style="margin-top: 0;">
+                <div class="table-responsive">
+                  <table>
+                    <thead>
                       <tr>
-                        {% for value in row %}
-                          <td>{{ value }}</td>
+                        {% for col in columns %}
+                          <th>{{ col }}</th>
                         {% endfor %}
                       </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {% for row in rows %}
+                        <tr>
+                          {% for value in row %}
+                            <td>{{ value|safe }}</td>
+                          {% endfor %}
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+            {% else %}
+              <div style="text-align: center; padding: 48px 24px; color: var(--text-muted);">
+                <div style="font-size: 36px; margin-bottom: 12px;">🔍</div>
+                <h4>No comparison matches found</h4>
+                <p style="font-size: 13px; margin-top: 6px;">Try adjusting filters or sync/rebuild database if it's currently empty.</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: LEADERBOARD -->
+        <div class="right-column">
+          <div class="glass-card" style="padding: 16px; margin-bottom: 0;">
+            <div class="card-title" style="margin-bottom: 12px;">🏆 Leaderboard</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+              Rankings based on order velocity (diff) for target date <strong>{{ target_date }}</strong>.
             </div>
-          {% else %}
-            <div style="text-align: center; padding: 48px 24px; color: var(--text-muted);">
-              <div style="font-size: 36px; margin-bottom: 12px;">🔍</div>
-              <h4>No comparison matches found</h4>
-              <p style="font-size: 13px; margin-top: 6px;">Try adjusting filters or sync/rebuild database if it's currently empty.</p>
-            </div>
-          {% endif %}
+            {% if leaderboard_rows %}
+              <div class="table-container" style="margin-top: 0;">
+                <div class="table-responsive leaderboard-table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style="width: 50px; text-align: center;">Rank</th>
+                        <th>Username</th>
+                        <th style="text-align: right;">Delta Orders</th>
+                        <th style="text-align: right;">Rank Change</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for row in leaderboard_rows %}
+                        <tr>
+                          <td style="text-align: center;">
+                            <div class="rank-cell {% if row.rank == 1 %}rank-1{% elif row.rank == 2 %}rank-2{% elif row.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+                              {{ row.rank }}
+                            </div>
+                          </td>
+                          <td>
+                            <div style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ row.username }}">{{ row.username }}</div>
+                            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="ID: {{ row.userNo }}">ID: {{ row.userNo }}</div>
+                          </td>
+                          <td style="text-align: right; font-weight: 700;">
+                            {% if row.deltaOrders > 0 %}
+                              <span class="badge badge-success">+{{ row.deltaOrders|round(0)|int }}</span>
+                            {% elif row.deltaOrders < 0 %}
+                              <span class="badge badge-danger">{{ row.deltaOrders|round(0)|int }}</span>
+                            {% else %}
+                              <span class="badge badge-neutral">0</span>
+                            {% endif %}
+                          </td>
+                          <td style="text-align: right;">
+                            {% if row.rank_change_pct is not none %}
+                              {% if row.rank_change_pct > 0 %}
+                                <span class="badge badge-success" style="font-size: 11px;">▲ {{ row.rank_change_pct|round(1) }}%</span>
+                              {% elif row.rank_change_pct < 0 %}
+                                <span class="badge badge-danger" style="font-size: 11px;">▼ {{ row.rank_change_pct|abs|round(1) }}%</span>
+                              {% else %}
+                                <span class="badge badge-neutral" style="font-size: 11px;">0.0%</span>
+                              {% endif %}
+                            {% else %}
+                              <span class="badge badge-neutral" style="font-size: 11px; background: rgba(99, 102, 241, 0.1); color: var(--color-primary); border-color: rgba(99, 102, 241, 0.2);">New</span>
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            {% else %}
+              <div style="text-align: center; padding: 24px; color: var(--text-muted);">
+                No leaderboard data available.
+              </div>
+            {% endif %}
+          </div>
         </div>
       </div>
     {% endif %}
@@ -1683,17 +1853,17 @@ COMPARE_TEMPLATE = """
     const COLUMN_MAPPING = {
       "userNo": "Merchant ID",
       "userName": "Username",
-      "nickName": "Nickname",
-      "completedOrderNum": "Total Orders",
-      "completedOrderNum_diff": "Orders Delta",
-      "completedBuyOrderNum": "Buy Orders",
+      "nickName": "Username(nickname)",
+      "completedOrderNum": "tot orders",
+      "completedOrderNum_diff": "delta orders",
+      "completedBuyOrderNum": "buy",
       "completedBuyOrderNum_diff": "Buy Orders Delta",
-      "completedSellOrderNum": "Sell Orders",
+      "completedSellOrderNum": "sell",
       "completedSellOrderNum_diff": "Sell Orders Delta",
-      "avgReleaseTimeOfLatest30day": "Avg Release Time (30d)",
-      "avgPayTimeOfLatest30day": "Avg Pay Time (30d)",
+      "avgReleaseTimeOfLatest30day": "avg release time",
+      "avgPayTimeOfLatest30day": "avg paytime",
       "completedOrderNumOfLatest30day": "Orders (30d)",
-      "date": "Data Date",
+      "date": "date",
       "created_at": "Collected At",
       "lastactivetime": "Last Active",
       "adcreatedtime": "Ad Created",
@@ -1706,7 +1876,10 @@ COMPARE_TEMPLATE = """
       "price": "Market Price",
       "surplusAmount": "Available Quantity",
       "minSingleTransAmount": "Min Trade Limit",
-      "maxSingleTransAmount": "Max Trade Limit"
+      "maxSingleTransAmount": "Max Trade Limit",
+      "registerDays": "reg days",
+      "rank": "rank",
+      "finishRateLatest30day": "finishrate"
     };
 
     function getHumanLabel(col) {
@@ -1733,7 +1906,7 @@ COMPARE_TEMPLATE = """
       const headers = document.querySelectorAll("thead th");
       headers.forEach(th => {
         const colName = th.textContent.trim();
-        if (colName === "Rank" || colName === "Merchant" || colName === "Diff") return;
+        if (colName === "Rank" || colName === "Merchant" || colName === "Diff" || colName === "Username" || colName === "Delta Orders" || colName === "Rank Change") return;
         const human = getHumanLabel(colName);
         th.innerHTML = `${human} <span class="empty-cell" style="font-size:10px; display:block; font-weight:normal; opacity:0.5; margin-top:2px;">${colName}</span>`;
       });
@@ -1757,7 +1930,7 @@ COMPARE_TEMPLATE = """
         const cells = row.querySelectorAll("td");
         cells.forEach((td, idx) => {
           const header = headerNames[idx];
-          if (header === "Rank" || header === "Merchant" || header === "Diff") return;
+          if (header === "Rank" || header === "Merchant" || header === "Diff" || header === "Username" || header === "Delta Orders" || header === "Rank Change" || header === "buy" || header === "sell" || header === "tot orders") return;
           const val = td.textContent.trim();
 
           // Format None / Empty
@@ -1905,7 +2078,7 @@ def sanitize_filters(args: Dict[str, str]) -> Dict[str, str]:
 
 def sanitize_compare_filters(args: Dict[str, str]) -> Dict[str, str]:
     limit_str = args.get("limit", "100").strip()
-    leaderboard_limit_str = args.get("leaderboard_limit", "20").strip()
+    leaderboard_limit_str = args.get("leaderboard_limit", "30").strip()
 
     try:
         limit = str(max(1, min(int(limit_str), 1000)))
@@ -1915,7 +2088,7 @@ def sanitize_compare_filters(args: Dict[str, str]) -> Dict[str, str]:
     try:
         leaderboard_limit = str(max(1, min(int(leaderboard_limit_str), 100)))
     except ValueError:
-        leaderboard_limit = "20"
+        leaderboard_limit = "30"
 
     col_op = args.get("col_op", "=").strip()
     if col_op not in ["=", "LIKE", ">", "<", ">=", "<="]:
@@ -2069,12 +2242,13 @@ def build_compare_query(columns: List[str], filters: Dict[str, str]) -> Tuple[st
                     where_clauses.append(f"CAST({col_name} AS REAL) {operator} ?")
                     params.append(numeric_val)
 
-    sql = f"SELECT * FROM {table_name}"
+    inner_sql = "SELECT *, ROW_NUMBER() OVER (PARTITION BY date ORDER BY COALESCE(completedOrderNum_diff, 0) DESC, userNo ASC) AS rank FROM compare"
+    sql = f"SELECT * FROM ({inner_sql})"
     if where_clauses:
         sql += " WHERE " + " AND ".join(where_clauses)
 
     if "date" in columns:
-        sql += " ORDER BY date DESC"
+        sql += " ORDER BY date DESC, rank ASC"
     else:
         sql += " ORDER BY rowid DESC"
 
@@ -2147,6 +2321,87 @@ def format_epoch_ms_time_columns(columns: List[str], rows: List[Tuple]) -> List[
 
         formatted_rows.append(tuple(row_values))
 
+    return formatted_rows
+
+
+def format_compare_deltas(columns: List[str], rows: List[Tuple]) -> List[Tuple]:
+    try:
+        buy_idx = columns.index("completedBuyOrderNum")
+        buy_diff_idx = columns.index("completedBuyOrderNum_diff")
+    except ValueError:
+        buy_idx = buy_diff_idx = None
+
+    try:
+        sell_idx = columns.index("completedSellOrderNum")
+        sell_diff_idx = columns.index("completedSellOrderNum_diff")
+    except ValueError:
+        sell_idx = sell_diff_idx = None
+
+    try:
+        tot_idx = columns.index("completedOrderNum")
+        tot_diff_idx = columns.index("completedOrderNum_diff")
+    except ValueError:
+        tot_idx = tot_diff_idx = None
+
+    if buy_idx is None and sell_idx is None and tot_idx is None:
+        return rows
+
+    formatted_rows: List[Tuple] = []
+    for row in rows:
+        row_list = list(row)
+        
+        # Format Buy
+        if buy_idx is not None and buy_diff_idx is not None:
+            buy_val = row_list[buy_idx]
+            buy_diff = row_list[buy_diff_idx]
+            if buy_val is not None:
+                if buy_diff is not None:
+                    try:
+                        diff_val = int(buy_diff)
+                        if diff_val > 0:
+                            row_list[buy_idx] = f"{buy_val} <span style='color: var(--color-success); font-weight: 600;'>(+{diff_val})</span>"
+                        elif diff_val < 0:
+                            row_list[buy_idx] = f"{buy_val} <span style='color: var(--color-danger); font-weight: 600;'>({diff_val})</span>"
+                        else:
+                            row_list[buy_idx] = f"{buy_val} <span style='color: var(--text-muted); font-weight: 600;'>(0)</span>"
+                    except ValueError:
+                        pass
+
+        # Format Sell
+        if sell_idx is not None and sell_diff_idx is not None:
+            sell_val = row_list[sell_idx]
+            sell_diff = row_list[sell_diff_idx]
+            if sell_val is not None:
+                if sell_diff is not None:
+                    try:
+                        diff_val = int(sell_diff)
+                        if diff_val > 0:
+                            row_list[sell_idx] = f"{sell_val} <span style='color: var(--color-success); font-weight: 600;'>(+{diff_val})</span>"
+                        elif diff_val < 0:
+                            row_list[sell_idx] = f"{sell_val} <span style='color: var(--color-danger); font-weight: 600;'>({diff_val})</span>"
+                        else:
+                            row_list[sell_idx] = f"{sell_val} <span style='color: var(--text-muted); font-weight: 600;'>(0)</span>"
+                    except ValueError:
+                        pass
+
+        # Format Tot Orders
+        if tot_idx is not None and tot_diff_idx is not None:
+            tot_val = row_list[tot_idx]
+            tot_diff = row_list[tot_diff_idx]
+            if tot_val is not None:
+                if tot_diff is not None:
+                    try:
+                        diff_val = int(tot_diff)
+                        if diff_val > 0:
+                            row_list[tot_idx] = f"{tot_val} <span style='color: var(--color-success); font-weight: 600;'>(+{diff_val})</span>"
+                        elif diff_val < 0:
+                            row_list[tot_idx] = f"{tot_val} <span style='color: var(--color-danger); font-weight: 600;'>({diff_val})</span>"
+                        else:
+                            row_list[tot_idx] = f"{tot_val} <span style='color: var(--text-muted); font-weight: 600;'>(0)</span>"
+                    except ValueError:
+                        pass
+                        
+        formatted_rows.append(tuple(row_list))
     return formatted_rows
 
 
@@ -2232,29 +2487,133 @@ def compare_dashboard():
     selected_columns: List[str] = []
     rows: List[Tuple] = []
     row_count = 0
-    leaderboard_rows: List[Tuple] = []
+    leaderboard_rows: List[Dict] = []
+    
+    total_users = 0
+    active_users = 0
+    sell_volume_cum_cr = 0.0
+    sell_volume_daily_cr = 0.0
+    target_date = ""
 
     try:
         with sqlite3.connect(COMPARE_DB_PATH) as conn:
             columns = get_table_columns(conn, "compare")
-            all_columns = columns
-            selected_columns = select_visible_columns(columns, request.args.getlist("visible_columns"))
-
             if not columns:
                 raise ValueError("Table 'compare' not found in compare.db")
+
+            columns.append("rank")
+
+            DEFAULT_COMPARE_COLUMNS = [
+                "nickName",
+                "date",
+                "completedBuyOrderNum",
+                "completedSellOrderNum",
+                "completedOrderNum",
+                "rank",
+                "registerDays",
+                "avgPayTimeOfLatest30day",
+                "avgReleaseTimeOfLatest30day",
+                "finishRateLatest30day"
+            ]
+
+            ordered_all = [col for col in DEFAULT_COMPARE_COLUMNS if col in columns]
+            remaining_cols = [col for col in columns if col not in ordered_all]
+            all_columns = ordered_all + remaining_cols
+
+            requested_visible = request.args.getlist("visible_columns")
+            if not requested_visible:
+                selected_columns = list(ordered_all)
+            else:
+                selected_columns = [col for col in requested_visible if col in columns]
+
+            # Determine target_date
+            date_to_val = filters.get("date_to")
+            if date_to_val:
+                cur = conn.execute("SELECT MAX(date) FROM compare WHERE date <= ?", (date_to_val,))
+            else:
+                cur = conn.execute("SELECT MAX(date) FROM compare")
+            target_date_row = cur.fetchone()
+            target_date = target_date_row[0] if target_date_row and target_date_row[0] else None
+
+            if not target_date:
+                cur = conn.execute("SELECT MAX(date) FROM compare")
+                target_date_row = cur.fetchone()
+                target_date = target_date_row[0] if target_date_row and target_date_row[0] else None
+
+            # Get the date prior to target_date
+            prev_date = None
+            if target_date:
+                cur = conn.execute("SELECT DISTINCT date FROM compare WHERE date < ? ORDER BY date DESC LIMIT 1", (target_date,))
+                prev_date_row = cur.fetchone()
+                prev_date = prev_date_row[0] if prev_date_row and prev_date_row[0] else None
+
+            # Query stats for target_date
+            if target_date:
+                # Total users
+                total_users = conn.execute("SELECT COUNT(1) FROM compare WHERE date = ?", (target_date,)).fetchone()[0]
+                # Active users (done at least one trade in last 24hrs)
+                active_users = conn.execute("SELECT COUNT(1) FROM compare WHERE date = ? AND completedOrderNum_diff >= 1", (target_date,)).fetchone()[0]
+                # Cumulative sell orders sum
+                sum_sell_orders = conn.execute("SELECT SUM(COALESCE(completedSellOrderNum, 0)) FROM compare WHERE date = ?", (target_date,)).fetchone()[0] or 0
+                # Daily sell orders sum
+                sum_sell_orders_diff = conn.execute("SELECT SUM(COALESCE(completedSellOrderNum_diff, 0)) FROM compare WHERE date = ?", (target_date,)).fetchone()[0] or 0
+                
+                sell_volume_cum_cr = (sum_sell_orders * 1250) / 10000000.0
+                sell_volume_daily_cr = (sum_sell_orders_diff * 1250) / 10000000.0
 
             query, params = build_compare_query(columns, filters)
             result = conn.execute(query, params).fetchall()
             rows = [tuple(r) for r in result]
             rows = format_epoch_ms_time_columns(columns, rows)
+            rows = format_compare_deltas(columns, rows)
             rows = project_rows(columns, rows, selected_columns)
             row_count = len(rows)
 
-            leaderboard_rows = fetch_compare_leaderboard(
-                conn,
-                columns,
-                int(filters["leaderboard_limit"]),
-            )
+            # Query leaderboard
+            leaderboard_limit = int(filters["leaderboard_limit"])
+            if target_date:
+                leaderboard_query = """
+                WITH latest_dates AS (
+                    SELECT ? as date_today, ? as date_yesterday
+                ),
+                today_ranks AS (
+                    SELECT userNo, nickName, completedOrderNum_diff,
+                           ROW_NUMBER() OVER (ORDER BY COALESCE(completedOrderNum_diff, 0) DESC, userNo ASC) as rank_today
+                    FROM compare
+                    WHERE date = (SELECT date_today FROM latest_dates)
+                ),
+                yesterday_ranks AS (
+                    SELECT userNo,
+                           ROW_NUMBER() OVER (ORDER BY COALESCE(completedOrderNum_diff, 0) DESC, userNo ASC) as rank_yesterday
+                    FROM compare
+                    WHERE date = (SELECT date_yesterday FROM latest_dates)
+                )
+                SELECT 
+                    t.rank_today,
+                    t.userNo,
+                    t.nickName,
+                    t.completedOrderNum_diff,
+                    y.rank_yesterday
+                FROM today_ranks t
+                LEFT JOIN yesterday_ranks y ON t.userNo = y.userNo
+                ORDER BY t.rank_today ASC
+                LIMIT ?
+                """
+                leaderboard_results = conn.execute(leaderboard_query, (target_date, prev_date, leaderboard_limit)).fetchall()
+                for r in leaderboard_results:
+                    rank_today, user_no, nick_name, delta_orders, rank_yesterday = r
+                    rank_change_pct = None
+                    if rank_yesterday:
+                        diff = rank_yesterday - rank_today
+                        rank_change_pct = (diff / rank_yesterday) * 100.0
+                    
+                    leaderboard_rows.append({
+                        "rank": rank_today,
+                        "userNo": user_no,
+                        "username": nick_name or "—",
+                        "deltaOrders": delta_orders or 0,
+                        "rank_change_pct": rank_change_pct
+                    })
 
     except Exception as exc:
         error = str(exc)
@@ -2268,6 +2627,11 @@ def compare_dashboard():
         rows=rows,
         row_count=row_count,
         leaderboard_rows=leaderboard_rows,
+        total_users=total_users,
+        active_users=active_users,
+        sell_volume_cum_cr=sell_volume_cum_cr,
+        sell_volume_daily_cr=sell_volume_daily_cr,
+        target_date=target_date,
         error=error,
         column_panel_open=bool(request.args.getlist("visible_columns")),
     )
