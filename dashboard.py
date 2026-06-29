@@ -1820,13 +1820,13 @@ COMPARE_TEMPLATE = """
                             {% endif %}
                           </td>
                           <td style="text-align: right;">
-                            {% if row.rank_change_pct is not none %}
-                              {% if row.rank_change_pct > 0 %}
-                                <span class="badge badge-success" style="font-size: 11px;">▲ {{ row.rank_change_pct|round(1) }}%</span>
-                              {% elif row.rank_change_pct < 0 %}
-                                <span class="badge badge-danger" style="font-size: 11px;">▼ {{ row.rank_change_pct|abs|round(1) }}%</span>
+                            {% if row.rank_change_num is not none %}
+                              {% if row.rank_change_num > 0 %}
+                                <span class="badge badge-success" style="font-size: 11px;">▲ {{ row.rank_change_num }}</span>
+                              {% elif row.rank_change_num < 0 %}
+                                <span class="badge badge-danger" style="font-size: 11px;">▼ {{ row.rank_change_num|abs }}</span>
                               {% else %}
-                                <span class="badge badge-neutral" style="font-size: 11px;">0.0%</span>
+                                <span class="badge badge-neutral" style="font-size: 11px;">0</span>
                               {% endif %}
                             {% else %}
                               <span class="badge badge-neutral" style="font-size: 11px; background: rgba(99, 102, 241, 0.1); color: var(--color-primary); border-color: rgba(99, 102, 241, 0.2);">New</span>
@@ -2602,17 +2602,16 @@ def compare_dashboard():
                 leaderboard_results = conn.execute(leaderboard_query, (target_date, prev_date, leaderboard_limit)).fetchall()
                 for r in leaderboard_results:
                     rank_today, user_no, nick_name, delta_orders, rank_yesterday = r
-                    rank_change_pct = None
+                    rank_change_num = None
                     if rank_yesterday:
-                        diff = rank_yesterday - rank_today
-                        rank_change_pct = (diff / rank_yesterday) * 100.0
+                        rank_change_num = rank_yesterday - rank_today
                     
                     leaderboard_rows.append({
                         "rank": rank_today,
                         "userNo": user_no,
                         "username": nick_name or "—",
                         "deltaOrders": delta_orders or 0,
-                        "rank_change_pct": rank_change_pct
+                        "rank_change_num": rank_change_num
                     })
 
     except Exception as exc:
