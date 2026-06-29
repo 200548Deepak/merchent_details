@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Sequence
 
-SOURCE_DB_PATH = Path(r"/home/ubuntu/merchent_details/merch_details.db")
-TARGET_DB_PATH = Path(r"/home/ubuntu/merchent_details/compare.db")
+SOURCE_DB_PATH = Path(r"merch_details.db")
+TARGET_DB_PATH = Path(r"compare.db")
 SOURCE_TABLE = "user_info"
 TARGET_TABLE = "compare"
 
@@ -105,7 +105,7 @@ def create_compare_table(conn: sqlite3.Connection) -> int:
     return cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
 
 
-def main() -> None:
+def rebuild_compare_db() -> int:
     TARGET_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     with sqlite3.connect(TARGET_DB_PATH) as conn:
@@ -113,7 +113,11 @@ def main() -> None:
         inserted_rows = create_compare_table(conn)
         conn.commit()
         conn.execute(f"DETACH DATABASE {quote_ident('src')}")
+    return inserted_rows
 
+
+def main() -> None:
+    inserted_rows = rebuild_compare_db()
     print("Created compare table in compare.db from user_info.")
     print("Added diff columns: completedOrderNum_diff, completedBuyOrderNum_diff, completedSellOrderNum_diff")
     print(f"Inserted {inserted_rows} rows")

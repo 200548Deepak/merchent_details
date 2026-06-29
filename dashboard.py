@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from flask import Flask, render_template_string, request
+from compare import rebuild_compare_db
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "merch_details.db"
@@ -20,90 +21,641 @@ TEMPLATE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Merchant Details Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; background: #f8fafc; color: #0f172a; }
-    h1 { margin: 0 0 16px; }
-    .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
-    .field { display: flex; flex-direction: column; min-width: 140px; }
-    label { font-size: 12px; color: #475569; margin-bottom: 4px; font-weight: 600; }
-    input, select, button { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
-    button { cursor: pointer; background: #2563eb; color: white; border: none; }
-    button:hover { background: #1d4ed8; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
-    th { background: #f1f5f9; position: sticky; top: 0; }
-    .table-wrap { max-height: 70vh; overflow: auto; }
-    .muted { color: #64748b; font-size: 12px; }
-    .stats { display: flex; gap: 18px; flex-wrap: wrap; }
-    .error { color: #b91c1c; font-weight: 600; }
-    .filter-section { border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 12px; }
+    :root {
+      --bg-space: #070913;
+      --bg-panel: rgba(16, 22, 40, 0.75);
+      --bg-panel-solid: #0f1524;
+      --border-glow: rgba(99, 102, 241, 0.15);
+      --border-muted: rgba(255, 255, 255, 0.08);
+      --color-primary: #6366f1;
+      --color-secondary: #06b6d4;
+      --color-success: #10b981;
+      --color-danger: #f43f5e;
+      --color-warning: #f59e0b;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dark: #64748b;
+      --accent-gradient: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-space);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      line-height: 1.5;
+      padding-bottom: 40px;
+    }
+
+    /* Navbar / Header */
+    .app-header {
+      background: rgba(15, 21, 36, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-muted);
+      padding: 14px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .brand-logo {
+      background: var(--accent-gradient);
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-menu {
+      display: flex;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border-muted);
+    }
+
+    .nav-btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .nav-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-btn.active {
+      color: #fff;
+      background: var(--color-primary);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+    }
+
+    /* Container layout */
+    .container {
+      max-width: 1440px;
+      margin: 24px auto;
+      padding: 0 24px;
+    }
+
+    .page-title-section {
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .page-title {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .page-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Card styling */
+    .glass-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-muted);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-main);
+      border-bottom: 1px solid var(--border-muted);
+      padding-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Filter Form & Grid */
+    .filters-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .filter-grid-primary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+
+    .filter-grid-secondary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      border-top: 1px solid var(--border-muted);
+      padding-top: 16px;
+      margin-top: 8px;
+    }
+
+    .input-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input, select {
+      background: rgba(15, 22, 40, 0.6);
+      border: 1px solid var(--border-muted);
+      border-radius: 8px;
+      color: var(--text-main);
+      padding: 10px 14px;
+      font-size: 13px;
+      font-family: inherit;
+      width: 100%;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+      background: rgba(15, 22, 40, 0.85);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: var(--accent-gradient);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: 1px solid var(--border-muted);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--text-muted);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-muted);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--accent-gradient);
+    }
+
+    .stat-icon {
+      font-size: 22px;
+      width: 46px;
+      height: 46px;
+      background: rgba(99, 102, 241, 0.1);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-primary);
+    }
+
+    .stat-content {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    /* Table styling */
+    .table-container {
+      border: 1px solid var(--border-muted);
+      border-radius: 10px;
+      overflow: hidden;
+      background: rgba(10, 15, 30, 0.4);
+      margin-top: 12px;
+    }
+
+    .table-responsive {
+      max-height: 65vh;
+      overflow-y: auto;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    th {
+      background: var(--bg-panel-solid);
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-muted);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-muted);
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr {
+      transition: background-color 0.15s ease;
+    }
+
+    tbody tr:hover {
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    tbody tr:nth-child(even) {
+      background-color: rgba(255, 255, 255, 0.005);
+    }
+
+    /* Scrollbars */
+    .table-responsive::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    .table-responsive::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--color-success);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .badge-danger {
+      background: rgba(244, 63, 94, 0.12);
+      color: var(--color-danger);
+      border: 1px solid rgba(244, 63, 94, 0.2);
+    }
+
+    .badge-neutral {
+      background: rgba(148, 163, 184, 0.1);
+      color: var(--text-muted);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+    }
+
+    .empty-cell {
+      color: var(--text-dark);
+      font-weight: 300;
+    }
+
+    /* SQL Debug Terminal */
+    .sql-terminal {
+      background: #05070f;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 16px;
+      font-family: "Courier New", Courier, monospace;
+      color: #38bdf8;
+      font-size: 12px;
+      overflow-x: auto;
+      margin-top: 12px;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+    }
+
+    .sql-terminal-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-dark);
+      font-size: 11px;
+      margin-bottom: 8px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    .collapsible-debug {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .collapsible-debug:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .debug-content {
+      display: none;
+      margin-top: 12px;
+    }
+
+    .debug-content.open {
+      display: block;
+    }
+
+    /* Error alert */
+    .error-card {
+      background: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.25);
+      border-radius: 10px;
+      padding: 16px;
+      color: var(--color-danger);
+      font-weight: 600;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Toast styles */
+    #toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      background: #131b2e;
+      border-radius: 8px;
+      border: 1px solid var(--border-muted);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+      padding: 12px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      min-width: 280px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    .toast-success {
+      border-left: 4px solid var(--color-success);
+    }
+    .toast-error {
+      border-left: 4px solid var(--color-danger);
+    }
   </style>
 </head>
 <body>
-  <h1>Merchant Details Dashboard</h1>
-  <p><a href="/compare">Open Compare Dashboard</a></p>
+  <header class="app-header">
+    <a href="/" class="brand">
+      <div class="brand-logo">📈</div>
+      <span class="brand-title">Merchant Analytics Hub</span>
+    </a>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <button type="button" class="btn btn-secondary" id="syncBtn" onclick="syncCompareDb()">
+        <span class="btn-text">Sync Compare DB</span>
+        <span class="spinner" style="display:none; margin-left: 5px;">⏳</span>
+      </button>
+      <nav class="nav-menu">
+        <a href="/" class="nav-btn" id="nav-btn-home">Merchants</a>
+        <a href="/compare" class="nav-btn" id="nav-btn-compare">Comparison</a>
+      </nav>
+    </div>
+  </header>
 
-  <div class="card">
-    <form method="get">
-      <div class="row">
-        <div class="field">
-          <label for="table">Table</label>
-          <select id="table" name="table" onchange="this.form.submit()">
-            {% for t in allowed_tables %}
-              <option value="{{ t }}" {% if t == filters.table %}selected{% endif %}>{{ t }}</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div class="field">
-          <label for="user_no">User No</label>
-          <input id="user_no" name="user_no" value="{{ filters.user_no }}" placeholder="Search userNo" />
-        </div>
-
-        <div class="field">
-          <label for="date_from">From Date</label>
-          <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" />
-        </div>
-
-        <div class="field">
-          <label for="date_to">To Date</label>
-          <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" />
-        </div>
-
-        <div class="field">
-          <label for="last_active_from">Last Active From (IST)</label>
-          <input id="last_active_from" type="datetime-local" name="last_active_from" value="{{ filters.last_active_from }}" />
-        </div>
-
-        <div class="field">
-          <label for="last_active_to">Last Active To (IST)</label>
-          <input id="last_active_to" type="datetime-local" name="last_active_to" value="{{ filters.last_active_to }}" />
-        </div>
-
-        <div class="field">
-          <label for="limit">Limit</label>
-          <input id="limit" type="number" min="1" max="1000" name="limit" value="{{ filters.limit }}" />
-        </div>
-
-        <div class="field">
-          <button type="submit">Apply Filters</button>
-        </div>
+  <main class="container">
+    <div class="page-title-section">
+      <div>
+        <h2 class="page-title">Merchant Database Explorer</h2>
+        <div class="page-subtitle">View and filter P2P advertiser and merchant telemetry data.</div>
       </div>
+    </div>
 
-      <div class="filter-section">
-        <div class="row">
-          <div class="field">
-            <label for="col_name">Column Filter</label>
+    {% if error %}
+      <div class="error-card">
+        <span>⚠️</span>
+        <div><strong>Query Error:</strong> {{ error }}</div>
+      </div>
+    {% endif %}
+
+    <div class="glass-card">
+      <div class="card-title">🔍 Filters & Settings</div>
+      <form method="get" class="filters-form">
+        <div class="filter-grid-primary">
+          <div class="input-wrapper">
+            <label for="table">Source Table</label>
+            <select id="table" name="table" onchange="this.form.submit()">
+              {% for t in allowed_tables %}
+                <option value="{{ t }}" {% if t == filters.table %}selected{% endif %}>{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="input-wrapper">
+            <label for="user_no">User ID</label>
+            <input id="user_no" name="user_no" value="{{ filters.user_no }}" placeholder="Filter userNo" />
+          </div>
+
+          <div class="input-wrapper">
+            <label for="date_from">From Date</label>
+            <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" />
+          </div>
+
+          <div class="input-wrapper">
+            <label for="date_to">To Date</label>
+            <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" />
+          </div>
+        </div>
+
+        <div class="filter-grid-secondary">
+          <div class="input-wrapper">
+            <label for="last_active_from">Last Active From (IST)</label>
+            <input id="last_active_from" type="datetime-local" name="last_active_from" value="{{ filters.last_active_from }}" />
+          </div>
+
+          <div class="input-wrapper">
+            <label for="last_active_to">Last Active To (IST)</label>
+            <input id="last_active_to" type="datetime-local" name="last_active_to" value="{{ filters.last_active_to }}" />
+          </div>
+
+          <div class="input-wrapper">
+            <label for="limit">Row Limit</label>
+            <input id="limit" type="number" min="1" max="1000" name="limit" value="{{ filters.limit }}" />
+          </div>
+        </div>
+
+        <div class="filter-grid-secondary" style="border-top: 1px dashed var(--border-muted); margin-top: 4px;">
+          <div class="input-wrapper">
+            <label for="col_name">Column filter</label>
             <select id="col_name" name="col_name">
-              <option value="">-- Select Column --</option>
+              <option value="">-- Choose Column --</option>
               {% for col in all_columns %}
                 <option value="{{ col }}" {% if col == filters.col_name %}selected{% endif %}>{{ col }}</option>
               {% endfor %}
             </select>
           </div>
 
-          <div class="field">
+          <div class="input-wrapper">
             <label for="col_op">Operator</label>
             <select id="col_op" name="col_op">
               <option value="=" {% if filters.col_op == "=" %}selected{% endif %}>=</option>
@@ -115,53 +667,282 @@ TEMPLATE = """
             </select>
           </div>
 
-          <div class="field">
-            <label for="col_val">Value</label>
-            <input id="col_val" name="col_val" value="{{ filters.col_val }}" placeholder="Filter value" />
+          <div class="input-wrapper">
+            <label for="col_val">Filter Value</label>
+            <input id="col_val" name="col_val" value="{{ filters.col_val }}" placeholder="e.g. Ordinary or 100" />
           </div>
         </div>
-        <p class="muted">Add column-level filters, e.g., badges = "Ordinary" or completedOrderNum > 100</p>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
+          <button type="button" class="btn btn-secondary" onclick="window.location.href='/'">Reset</button>
+          <button type="submit" class="btn btn-primary">Apply Queries</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-content">
+          <span class="stat-label">Rows Loaded</span>
+          <span class="stat-value">{{ row_count }}</span>
+        </div>
       </div>
-    </form>
-  </div>
+      <div class="stat-card">
+        <div class="stat-icon">🗄️</div>
+        <div class="stat-content">
+          <span class="stat-label">Total in Table</span>
+          <span class="stat-value">{{ total_rows }}</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-content">
+          <span class="stat-label">Unique Merchants</span>
+          <span class="stat-value">
+            {% if distinct_users > 0 %}
+              {{ distinct_users }}
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
 
-  <div class="card stats">
-    <div><b>Rows shown:</b> {{ row_count }}</div>
-    <div><b>Total in table:</b> {{ total_rows }}</div>
-    <div><b>Distinct users in table:</b> {{ distinct_users }}</div>
-  </div>
-
-  {% if error %}
-    <div class="card error">{{ error }}</div>
-  {% else %}
-    {% if query_executed %}
-      <div class="card muted">
-        <b>Debug - SQL Query:</b><br>
-        <code>{{ query_executed }}</code><br>
-        <b>Parameters:</b> {{ query_params }}
+    {% if not error %}
+      <div class="glass-card" style="padding: 16px;">
+        <div class="card-title" style="margin-bottom: 12px; border-bottom: none; padding-bottom: 0;">📋 Query Results</div>
+        
+        {% if rows %}
+          <div class="table-container">
+            <div class="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    {% for col in columns %}
+                      <th>{{ col }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in rows %}
+                    <tr>
+                      {% for value in row %}
+                        <td>{{ value }}</td>
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% else %}
+          <div style="text-align: center; padding: 48px 24px; color: var(--text-muted);">
+            <div style="font-size: 36px; margin-bottom: 12px;">🔍</div>
+            <h4>No matching merchant records found</h4>
+            <p style="font-size: 13px; margin-top: 6px;">Try adjusting your search filters or check your source table selection.</p>
+          </div>
+        {% endif %}
       </div>
     {% endif %}
-    <div class="card table-wrap">
-      <table>
-        <thead>
-          <tr>
-            {% for col in columns %}
-              <th>{{ col }}</th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in rows %}
-            <tr>
-              {% for value in row %}
-                <td>{{ value }}</td>
-              {% endfor %}
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% endif %}
+
+    {% if query_executed %}
+      <div class="glass-card" style="padding: 16px;">
+        <div class="collapsible-debug" onclick="toggleDebugPanel()">
+          <span>🛠️ SQL Inspector (Developer Tool)</span>
+          <span id="debugPanelIcon">▶</span>
+        </div>
+        <div id="debugPanelContent" class="debug-content">
+          <div class="sql-terminal-header">
+            <span>Executed Query Details</span>
+          </div>
+          <div class="sql-terminal">
+            {{ query_executed }}
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 10px;">
+            <strong>Bindings:</strong> <code>{{ query_params }}</code>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </main>
+
+  <script>
+    const COLUMN_MAPPING = {
+      "userNo": "Merchant ID",
+      "userName": "Username",
+      "nickName": "Nickname",
+      "completedOrderNum": "Total Orders",
+      "completedOrderNum_diff": "Orders Delta",
+      "completedBuyOrderNum": "Buy Orders",
+      "completedBuyOrderNum_diff": "Buy Orders Delta",
+      "completedSellOrderNum": "Sell Orders",
+      "completedSellOrderNum_diff": "Sell Orders Delta",
+      "avgReleaseTimeOfLatest30day": "Avg Release Time (30d)",
+      "avgPayTimeOfLatest30day": "Avg Pay Time (30d)",
+      "completedOrderNumOfLatest30day": "Orders (30d)",
+      "date": "Data Date",
+      "created_at": "Collected At",
+      "lastactivetime": "Last Active",
+      "adcreatedtime": "Ad Created",
+      "adupdatedtime": "Ad Updated",
+      "badges": "Verification Status",
+      "userType": "Merchant Type",
+      "tradeType": "Trade Type",
+      "asset": "Crypto Asset",
+      "fiat": "Fiat Currency",
+      "price": "Market Price",
+      "surplusAmount": "Available Quantity",
+      "minSingleTransAmount": "Min Trade Limit",
+      "maxSingleTransAmount": "Max Trade Limit"
+    };
+
+    function getHumanLabel(col) {
+      if (COLUMN_MAPPING[col]) return COLUMN_MAPPING[col];
+      let label = col.replace(/_diff$/, ' Delta');
+      label = label.replace(/([A-Z])/g, ' $1');
+      label = label.replace(/_/g, ' ');
+      label = label.trim();
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // Determine active nav tab
+      const path = window.location.pathname;
+      const navBtnHome = document.getElementById('nav-btn-home');
+      const navBtnCompare = document.getElementById('nav-btn-compare');
+      if (path === '/compare') {
+        if (navBtnCompare) navBtnCompare.classList.add('active');
+      } else {
+        if (navBtnHome) navBtnHome.classList.add('active');
+      }
+
+      // Format table headers
+      const headers = document.querySelectorAll("thead th");
+      headers.forEach(th => {
+        const colName = th.textContent.trim();
+        const human = getHumanLabel(colName);
+        th.innerHTML = `${human} <span class="empty-cell" style="font-size:10px; display:block; font-weight:normal; opacity:0.5; margin-top:2px;">${colName}</span>`;
+      });
+
+      // Format cells
+      const headerNames = Array.from(document.querySelectorAll("thead th")).map(th => {
+        const span = th.querySelector("span");
+        return span ? span.textContent.trim() : th.textContent.trim();
+      });
+
+      const rows = document.querySelectorAll("tbody tr");
+      rows.forEach(row => {
+        const cells = row.querySelectorAll("td");
+        cells.forEach((td, idx) => {
+          const header = headerNames[idx];
+          const val = td.textContent.trim();
+
+          // Format None / Empty
+          if (val === "None" || val === "" || val === "null") {
+            td.innerHTML = `<span class="empty-cell">—</span>`;
+            return;
+          }
+
+          // Format diff delta badges
+          if (header && (header.endsWith("_diff") || header.includes("diff") || header.endsWith("Delta"))) {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+              if (num > 0) {
+                td.innerHTML = `<span class="badge badge-success">+${num}</span>`;
+              } else if (num < 0) {
+                td.innerHTML = `<span class="badge badge-danger">${num}</span>`;
+              } else {
+                td.innerHTML = `<span class="badge badge-neutral">0</span>`;
+              }
+            }
+            return;
+          }
+
+          // Format float rounding
+          const floatVal = parseFloat(val);
+          if (!isNaN(floatVal) && val.includes('.') && val.split('.')[1].length > 2) {
+            if (header.toLowerCase().includes("time") || header.toLowerCase().includes("rate") || header.toLowerCase().includes("avg")) {
+              td.textContent = floatVal.toFixed(2);
+            }
+          }
+        });
+      });
+    });
+
+    function toggleDebugPanel() {
+      const content = document.getElementById('debugPanelContent');
+      const icon = document.getElementById('debugPanelIcon');
+      if (content) {
+        content.classList.toggle('open');
+        if (content.classList.contains('open')) {
+          if (icon) icon.textContent = '▼';
+        } else {
+          if (icon) icon.textContent = '▶';
+        }
+      }
+    }
+
+    async function syncCompareDb() {
+      const btn = document.getElementById('syncBtn');
+      if (!btn) return;
+      const btnText = btn.querySelector('.btn-text');
+      const spinner = btn.querySelector('.spinner');
+      
+      btn.disabled = true;
+      if (btnText) btnText.textContent = "Syncing...";
+      if (spinner) spinner.style.display = "inline-block";
+      
+      try {
+        const response = await fetch('/api/rebuild-compare', { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+          showToast('success', `Comparison database rebuilt! ${data.inserted_rows} rows updated.`);
+          setTimeout(() => {
+            if (window.location.pathname === '/compare') {
+              window.location.reload();
+            }
+          }, 1200);
+        } else {
+          showToast('error', `Sync failed: ${data.error}`);
+        }
+      } catch (err) {
+        showToast('error', `Network error: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        if (btnText) btnText.textContent = "Sync Compare DB";
+        if (spinner) spinner.style.display = "none";
+      }
+    }
+
+    function showToast(type, message) {
+      let container = document.getElementById('toast-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        document.body.appendChild(container);
+      }
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.innerHTML = `
+        <span>${type === 'success' ? '✅' : '❌'}</span>
+        <div>${message}</div>
+      `;
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+      }, 10);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-20px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+  </script>
 </body>
 </html>
 """
@@ -174,190 +955,907 @@ COMPARE_TEMPLATE = """
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Compare Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; background: #f8fafc; color: #0f172a; }
-    h1 { margin: 0 0 16px; }
-    .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
-    .field { display: flex; flex-direction: column; min-width: 140px; }
-    label { font-size: 12px; color: #475569; margin-bottom: 4px; font-weight: 600; }
-    input, select, button { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
-    button { cursor: pointer; background: #2563eb; color: white; border: none; }
-    button:hover { background: #1d4ed8; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
-    th { background: #f1f5f9; position: sticky; top: 0; }
-    .table-wrap { max-height: 60vh; overflow: auto; }
-    .muted { color: #64748b; font-size: 12px; }
-    .error { color: #b91c1c; font-weight: 600; }
-    .split { display: grid; grid-template-columns: 1fr; gap: 16px; }
-    .column-toggle-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
-    .secondary-button { background: #e2e8f0; color: #0f172a; }
-    .secondary-button:hover { background: #cbd5e1; }
-    .column-panel { margin-top: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; display: none; }
-    .column-panel.open { display: block; }
-    .checkbox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 12px; margin-top: 8px; }
-    .checkbox-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #0f172a; }
-    .checkbox-item input { margin: 0; }
-    @media (min-width: 1000px) {
-      .split { grid-template-columns: 1fr 1fr; }
+    :root {
+      --bg-space: #070913;
+      --bg-panel: rgba(16, 22, 40, 0.75);
+      --bg-panel-solid: #0f1524;
+      --border-glow: rgba(99, 102, 241, 0.15);
+      --border-muted: rgba(255, 255, 255, 0.08);
+      --color-primary: #6366f1;
+      --color-secondary: #06b6d4;
+      --color-success: #10b981;
+      --color-danger: #f43f5e;
+      --color-warning: #f59e0b;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dark: #64748b;
+      --accent-gradient: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-space);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      line-height: 1.5;
+      padding-bottom: 40px;
+    }
+
+    /* Navbar / Header */
+    .app-header {
+      background: rgba(15, 21, 36, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-muted);
+      padding: 14px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .brand-logo {
+      background: var(--accent-gradient);
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-menu {
+      display: flex;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border-muted);
+    }
+
+    .nav-btn {
+      padding: 8px 18px;
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    .nav-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-btn.active {
+      color: #fff;
+      background: var(--color-primary);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+    }
+
+    /* Container layout */
+    .container {
+      max-width: 1440px;
+      margin: 24px auto;
+      padding: 0 24px;
+    }
+
+    .page-title-section {
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .page-title {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .page-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Card styling */
+    .glass-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-muted);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-main);
+      border-bottom: 1px solid var(--border-muted);
+      padding-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Filter Form & Grid */
+    .filters-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .filter-grid-primary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+
+    .filter-grid-secondary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      border-top: 1px solid var(--border-muted);
+      padding-top: 16px;
+      margin-top: 8px;
+    }
+
+    .input-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input, select {
+      background: rgba(15, 22, 40, 0.6);
+      border: 1px solid var(--border-muted);
+      border-radius: 8px;
+      color: var(--text-main);
+      padding: 10px 14px;
+      font-size: 13px;
+      font-family: inherit;
+      width: 100%;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+      background: rgba(15, 22, 40, 0.85);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: var(--accent-gradient);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: 1px solid var(--border-muted);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--text-muted);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Table styling */
+    .table-container {
+      border: 1px solid var(--border-muted);
+      border-radius: 10px;
+      overflow: hidden;
+      background: rgba(10, 15, 30, 0.4);
+      margin-top: 12px;
+    }
+
+    .table-responsive {
+      max-height: 55vh;
+      overflow-y: auto;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    th {
+      background: var(--bg-panel-solid);
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-muted);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-muted);
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr {
+      transition: background-color 0.15s ease;
+    }
+
+    tbody tr:hover {
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Scrollbars */
+    .table-responsive::-webkit-scrollbar,
+    .column-panel::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    .table-responsive::-webkit-scrollbar-track,
+    .column-panel::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb,
+    .column-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb:hover,
+    .column-panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--color-success);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .badge-danger {
+      background: rgba(244, 63, 94, 0.12);
+      color: var(--color-danger);
+      border: 1px solid rgba(244, 63, 94, 0.2);
+    }
+
+    .badge-neutral {
+      background: rgba(148, 163, 184, 0.1);
+      color: var(--text-muted);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+    }
+
+    .empty-cell {
+      color: var(--text-dark);
+      font-weight: 300;
+    }
+
+    /* Column Panel modal-like */
+    .column-panel {
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid var(--border-muted);
+      border-radius: 10px;
+      background: rgba(15, 22, 40, 0.95);
+      display: none;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .column-panel.open {
+      display: block;
+      animation: slideDown 0.2s ease-out;
+    }
+
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 10px 16px;
+      margin-top: 12px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text-main);
+      cursor: pointer;
+      user-select: none;
+      padding: 8px;
+      border-radius: 6px;
+      transition: background 0.15s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .checkbox-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .checkbox-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--color-primary);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* Split layout */
+    .split-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    @media (min-width: 1100px) {
+      .split-layout {
+        grid-template-columns: 380px 1fr;
+      }
+    }
+
+    .rank-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    .rank-1 { background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%); color: #fff; box-shadow: 0 2px 8px rgba(251, 191, 36, 0.4); }
+    .rank-2 { background: linear-gradient(135deg, #cbd5e1 0%, #64748b 100%); color: #fff; box-shadow: 0 2px 8px rgba(203, 213, 225, 0.4); }
+    .rank-3 { background: linear-gradient(135deg, #b45309 0%, #78350f 100%); color: #fff; box-shadow: 0 2px 8px rgba(180, 83, 9, 0.4); }
+    .rank-other { background: rgba(255, 255, 255, 0.05); color: var(--text-muted); border: 1px solid var(--border-muted); }
+
+    /* Error alert */
+    .error-card {
+      background: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.25);
+      border-radius: 10px;
+      padding: 16px;
+      color: var(--color-danger);
+      font-weight: 600;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Toast styles */
+    #toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      background: #131b2e;
+      border-radius: 8px;
+      border: 1px solid var(--border-muted);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+      padding: 12px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      min-width: 280px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    .toast-success {
+      border-left: 4px solid var(--color-success);
+    }
+    .toast-error {
+      border-left: 4px solid var(--color-danger);
     }
   </style>
 </head>
 <body>
-  <h1>Compare Dashboard</h1>
-  <p><a href="/">Back to Merchant Dashboard</a></p>
+  <header class="app-header">
+    <a href="/" class="brand">
+      <div class="brand-logo">📈</div>
+      <span class="brand-title">Merchant Analytics Hub</span>
+    </a>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <button type="button" class="btn btn-secondary" id="syncBtn" onclick="syncCompareDb()">
+        <span class="btn-text">Sync Compare DB</span>
+        <span class="spinner" style="display:none; margin-left: 5px;">⏳</span>
+      </button>
+      <nav class="nav-menu">
+        <a href="/" class="nav-btn" id="nav-btn-home">Merchants</a>
+        <a href="/compare" class="nav-btn" id="nav-btn-compare">Comparison</a>
+      </nav>
+    </div>
+  </header>
 
-  <div class="card">
-    <form method="get">
-      <div class="row">
-        <div class="field">
-          <label for="user_no">User No</label>
-          <input id="user_no" name="user_no" value="{{ filters.user_no }}" placeholder="Search userNo" />
-        </div>
-
-        <div class="field">
-          <label for="date_from">From Date</label>
-          <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" />
-        </div>
-
-        <div class="field">
-          <label for="date_to">To Date</label>
-          <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" />
-        </div>
-
-        <div class="field">
-          <label for="limit">Rows Limit</label>
-          <input id="limit" type="number" min="1" max="1000" name="limit" value="{{ filters.limit }}" />
-        </div>
-
-        <div class="field">
-          <label for="leaderboard_limit">Leaderboard Top</label>
-          <input id="leaderboard_limit" type="number" min="1" max="100" name="leaderboard_limit" value="{{ filters.leaderboard_limit }}" />
-        </div>
-
-        <div class="field">
-          <button type="submit">Apply Filters</button>
-        </div>
-      </div>
-
-      <div class="row" style="margin-top:12px;">
-        <div class="field">
-          <label for="col_name">Column Filter</label>
-          <select id="col_name" name="col_name">
-            <option value="">-- Select Column --</option>
-            {% for col in all_columns %}
-              <option value="{{ col }}" {% if col == filters.col_name %}selected{% endif %}>{{ col }}</option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div class="field">
-          <label for="col_op">Operator</label>
-          <select id="col_op" name="col_op">
-            <option value="=" {% if filters.col_op == "=" %}selected{% endif %}>=</option>
-            <option value="LIKE" {% if filters.col_op == "LIKE" %}selected{% endif %}>Contains</option>
-            <option value=">" {% if filters.col_op == ">" %}selected{% endif %}>&gt;</option>
-            <option value="<" {% if filters.col_op == "<" %}selected{% endif %}>&lt;</option>
-            <option value=">=" {% if filters.col_op == ">=" %}selected{% endif %}>&gt;=</option>
-            <option value="<=" {% if filters.col_op == "<=" %}selected{% endif %}>&lt;=</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label for="col_val">Value</label>
-          <input id="col_val" name="col_val" value="{{ filters.col_val }}" placeholder="Filter value" />
-        </div>
-      </div>
-
-      <div class="column-toggle-row">
-        <button type="button" class="secondary-button" onclick="toggleColumnPanel()">Choose Visible Columns</button>
-        <span class="muted">Use the checkboxes below to show or hide columns in the compare table.</span>
-      </div>
-
-      <div id="columnPanel" class="column-panel {% if column_panel_open %}open{% endif %}">
-        <div class="row" style="align-items:center; justify-content: space-between;">
-          <div>
-            <b>Visible Columns</b>
-            <div class="muted">Leave at least one column selected to keep the preview useful.</div>
-          </div>
-          <button type="submit">Apply Column Selection</button>
-        </div>
-        <div class="checkbox-grid">
-          {% for col in all_columns %}
-            <label class="checkbox-item">
-              <input type="checkbox" name="visible_columns" value="{{ col }}" {% if col in selected_columns %}checked{% endif %} />
-              <span>{{ col }}</span>
-            </label>
-          {% endfor %}
-        </div>
-      </div>
-    </form>
-  </div>
-
-  {% if error %}
-    <div class="card error">{{ error }}</div>
-  {% else %}
-    <div class="split">
-      <div class="card">
-        <h3>Top Users by completedOrderNum_diff (Latest Date)</h3>
-        <p class="muted">Computed per user from the latest date available in compare.db.</p>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>User No</th>
-                <th>Nickname</th>
-                <th>Total completedOrderNum_diff</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in leaderboard_rows %}
-                <tr>
-                  <td>{{ loop.index }}</td>
-                  <td>{{ row[0] }}</td>
-                  <td>{{ row[1] }}</td>
-                  <td>{{ row[2] }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Compare Table Preview</h3>
-        <p class="muted"><b>Rows shown:</b> {{ row_count }}</p>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                {% for col in columns %}
-                  <th>{{ col }}</th>
-                {% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in rows %}
-                <tr>
-                  {% for value in row %}
-                    <td>{{ value }}</td>
-                  {% endfor %}
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+  <main class="container">
+    <div class="page-title-section">
+      <div>
+        <h2 class="page-title">Comparison Analytics</h2>
+        <div class="page-subtitle">Inspect differences between snapshot runs and track merchant order velocity.</div>
       </div>
     </div>
-  {% endif %}
+
+    {% if error %}
+      <div class="error-card">
+        <span>⚠️</span>
+        <div><strong>Comparison Error:</strong> {{ error }}</div>
+      </div>
+    {% endif %}
+
+    <div class="glass-card">
+      <div class="card-title">🔍 Comparison Filters</div>
+      <form method="get" class="filters-form">
+        <div class="filter-grid-primary">
+          <div class="input-wrapper">
+            <label for="user_no">User ID</label>
+            <input id="user_no" name="user_no" value="{{ filters.user_no }}" placeholder="Filter userNo" />
+          </div>
+
+          <div class="input-wrapper">
+            <label for="date_from">From Date</label>
+            <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" />
+          </div>
+
+          <div class="input-wrapper">
+            <label for="date_to">To Date</label>
+            <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" />
+          </div>
+
+          <div class="input-wrapper">
+            <label for="limit">Preview Limit</label>
+            <input id="limit" type="number" min="1" max="1000" name="limit" value="{{ filters.limit }}" />
+          </div>
+
+          <div class="input-wrapper">
+            <label for="leaderboard_limit">Leaderboard Limit</label>
+            <input id="leaderboard_limit" type="number" min="1" max="100" name="leaderboard_limit" value="{{ filters.leaderboard_limit }}" />
+          </div>
+        </div>
+
+        <div class="filter-grid-secondary">
+          <div class="input-wrapper">
+            <label for="col_name">Column filter</label>
+            <select id="col_name" name="col_name">
+              <option value="">-- Choose Column --</option>
+              {% for col in all_columns %}
+                <option value="{{ col }}" {% if col == filters.col_name %}selected{% endif %}>{{ col }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="input-wrapper">
+            <label for="col_op">Operator</label>
+            <select id="col_op" name="col_op">
+              <option value="=" {% if filters.col_op == "=" %}selected{% endif %}>=</option>
+              <option value="LIKE" {% if filters.col_op == "LIKE" %}selected{% endif %}>Contains</option>
+              <option value=">" {% if filters.col_op == ">" %}selected{% endif %}>&gt;</option>
+              <option value="<" {% if filters.col_op == "<" %}selected{% endif %}>&lt;</option>
+              <option value=">=" {% if filters.col_op == ">=" %}selected{% endif %}>&gt;=</option>
+              <option value="<=" {% if filters.col_op == "<=" %}selected{% endif %}>&lt;=</option>
+            </select>
+          </div>
+
+          <div class="input-wrapper">
+            <label for="col_val">Filter Value</label>
+            <input id="col_val" name="col_val" value="{{ filters.col_val }}" placeholder="e.g. 10 or Active" />
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px; border-top: 1px dashed var(--border-muted); padding-top: 16px;">
+          <button type="button" class="btn btn-secondary" onclick="toggleColumnPanel()">Configure Table Columns</button>
+          <div style="display: flex; gap: 12px;">
+            <button type="button" class="btn btn-secondary" onclick="window.location.href='/compare'">Reset</button>
+            <button type="submit" class="btn btn-primary">Apply Queries</button>
+          </div>
+        </div>
+
+        <div id="columnPanel" class="column-panel {% if column_panel_open %}open{% endif %}">
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-muted); padding-bottom: 10px; margin-bottom: 10px;">
+            <div>
+              <strong style="font-size: 13px;">Visible Output Columns</strong>
+              <div style="font-size:11px; color: var(--text-muted); margin-top: 2px;">Deselected fields will be hidden in the Comparison preview table below.</div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="padding: 6px 14px; font-size: 12px;">Apply Selected Columns</button>
+          </div>
+          <div class="checkbox-grid">
+            {% for col in all_columns %}
+              <label class="checkbox-item" title="{{ col }}">
+                <input type="checkbox" name="visible_columns" value="{{ col }}" {% if col in selected_columns %}checked{% endif %} />
+                <span>{{ col }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+      </form>
+    </div>
+
+    {% if not error %}
+      <div class="split-layout">
+        <!-- Leaderboard Card -->
+        <div class="glass-card" style="padding: 16px;">
+          <div class="card-title" style="margin-bottom: 12px;">🏆 Leaderboard</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+            Top performing merchants based on order volume change (Latest snapshot run).
+          </div>
+          {% if leaderboard_rows %}
+            <div class="table-container" style="margin-top: 0;">
+              <div class="table-responsive" style="max-height: 55vh;">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width: 50px; text-align: center;">Rank</th>
+                      <th>Merchant</th>
+                      <th style="text-align: right;">Diff</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in leaderboard_rows %}
+                      <tr>
+                        <td style="text-align: center;">
+                          <div class="rank-cell {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}rank-other{% endif %}">
+                            {{ loop.index }}
+                          </div>
+                        </td>
+                        <td>
+                          <div style="font-weight: 600;">{{ row[1] if row[1] else '—' }}</div>
+                          <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">ID: {{ row[0] }}</div>
+                        </td>
+                        <td style="text-align: right; font-weight: 700;">
+                          {% if row[2] > 0 %}
+                            <span class="badge badge-success">+{{ row[2]|round(0)|int }}</span>
+                          {% elif row[2] < 0 %}
+                            <span class="badge badge-danger">{{ row[2]|round(0)|int }}</span>
+                          {% else %}
+                            <span class="badge badge-neutral">0</span>
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {% else %}
+            <div style="text-align: center; padding: 24px; color: var(--text-muted);">
+              No leaderboard data. Make sure <code>completedOrderNum_diff</code> is populated.
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Table Preview -->
+        <div class="glass-card" style="padding: 16px;">
+          <div class="card-title" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <span>📋 Comparison Preview</span>
+            <span style="font-size:12px; color: var(--text-muted); font-weight: normal; text-transform: none;">Rows shown: {{ row_count }}</span>
+          </div>
+          
+          {% if rows %}
+            <div class="table-container" style="margin-top: 0;">
+              <div class="table-responsive">
+                <table>
+                  <thead>
+                    <tr>
+                      {% for col in columns %}
+                        <th>{{ col }}</th>
+                      {% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in rows %}
+                      <tr>
+                        {% for value in row %}
+                          <td>{{ value }}</td>
+                        {% endfor %}
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {% else %}
+            <div style="text-align: center; padding: 48px 24px; color: var(--text-muted);">
+              <div style="font-size: 36px; margin-bottom: 12px;">🔍</div>
+              <h4>No comparison matches found</h4>
+              <p style="font-size: 13px; margin-top: 6px;">Try adjusting filters or sync/rebuild database if it's currently empty.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </main>
+
   <script>
+    const COLUMN_MAPPING = {
+      "userNo": "Merchant ID",
+      "userName": "Username",
+      "nickName": "Nickname",
+      "completedOrderNum": "Total Orders",
+      "completedOrderNum_diff": "Orders Delta",
+      "completedBuyOrderNum": "Buy Orders",
+      "completedBuyOrderNum_diff": "Buy Orders Delta",
+      "completedSellOrderNum": "Sell Orders",
+      "completedSellOrderNum_diff": "Sell Orders Delta",
+      "avgReleaseTimeOfLatest30day": "Avg Release Time (30d)",
+      "avgPayTimeOfLatest30day": "Avg Pay Time (30d)",
+      "completedOrderNumOfLatest30day": "Orders (30d)",
+      "date": "Data Date",
+      "created_at": "Collected At",
+      "lastactivetime": "Last Active",
+      "adcreatedtime": "Ad Created",
+      "adupdatedtime": "Ad Updated",
+      "badges": "Verification Status",
+      "userType": "Merchant Type",
+      "tradeType": "Trade Type",
+      "asset": "Crypto Asset",
+      "fiat": "Fiat Currency",
+      "price": "Market Price",
+      "surplusAmount": "Available Quantity",
+      "minSingleTransAmount": "Min Trade Limit",
+      "maxSingleTransAmount": "Max Trade Limit"
+    };
+
+    function getHumanLabel(col) {
+      if (COLUMN_MAPPING[col]) return COLUMN_MAPPING[col];
+      let label = col.replace(/_diff$/, ' Delta');
+      label = label.replace(/([A-Z])/g, ' $1');
+      label = label.replace(/_/g, ' ');
+      label = label.trim();
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // Determine active nav tab
+      const path = window.location.pathname;
+      const navBtnHome = document.getElementById('nav-btn-home');
+      const navBtnCompare = document.getElementById('nav-btn-compare');
+      if (path === '/compare') {
+        if (navBtnCompare) navBtnCompare.classList.add('active');
+      } else {
+        if (navBtnHome) navBtnHome.classList.add('active');
+      }
+
+      // Format table headers
+      const headers = document.querySelectorAll("thead th");
+      headers.forEach(th => {
+        const colName = th.textContent.trim();
+        if (colName === "Rank" || colName === "Merchant" || colName === "Diff") return;
+        const human = getHumanLabel(colName);
+        th.innerHTML = `${human} <span class="empty-cell" style="font-size:10px; display:block; font-weight:normal; opacity:0.5; margin-top:2px;">${colName}</span>`;
+      });
+
+      // Format checkboxes in Config Columns
+      const checkLabels = document.querySelectorAll(".checkbox-item span");
+      checkLabels.forEach(span => {
+        const colName = span.textContent.trim();
+        const human = getHumanLabel(colName);
+        span.innerHTML = `<strong>${human}</strong> <span style="font-size:11px; opacity:0.5; margin-left:4px;">(${colName})</span>`;
+      });
+
+      // Format cells
+      const headerNames = Array.from(document.querySelectorAll("thead th")).map(th => {
+        const span = th.querySelector("span");
+        return span ? span.textContent.trim() : th.textContent.trim();
+      });
+
+      const rows = document.querySelectorAll("tbody tr");
+      rows.forEach(row => {
+        const cells = row.querySelectorAll("td");
+        cells.forEach((td, idx) => {
+          const header = headerNames[idx];
+          if (header === "Rank" || header === "Merchant" || header === "Diff") return;
+          const val = td.textContent.trim();
+
+          // Format None / Empty
+          if (val === "None" || val === "" || val === "null") {
+            td.innerHTML = `<span class="empty-cell">—</span>`;
+            return;
+          }
+
+          // Format diff delta badges
+          if (header && (header.endsWith("_diff") || header.includes("diff") || header.endsWith("Delta"))) {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+              if (num > 0) {
+                td.innerHTML = `<span class="badge badge-success">+${num}</span>`;
+              } else if (num < 0) {
+                td.innerHTML = `<span class="badge badge-danger">${num}</span>`;
+              } else {
+                td.innerHTML = `<span class="badge badge-neutral">0</span>`;
+              }
+            }
+            return;
+          }
+
+          // Format float rounding
+          const floatVal = parseFloat(val);
+          if (!isNaN(floatVal) && val.includes('.') && val.split('.')[1].length > 2) {
+            if (header.toLowerCase().includes("time") || header.toLowerCase().includes("rate") || header.toLowerCase().includes("avg")) {
+              td.textContent = floatVal.toFixed(2);
+            }
+          }
+        });
+      });
+    });
+
     function toggleColumnPanel() {
       const panel = document.getElementById('columnPanel');
       if (panel) {
         panel.classList.toggle('open');
       }
+    }
+
+    async function syncCompareDb() {
+      const btn = document.getElementById('syncBtn');
+      if (!btn) return;
+      const btnText = btn.querySelector('.btn-text');
+      const spinner = btn.querySelector('.spinner');
+      
+      btn.disabled = true;
+      if (btnText) btnText.textContent = "Syncing...";
+      if (spinner) spinner.style.display = "inline-block";
+      
+      try {
+        const response = await fetch('/api/rebuild-compare', { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+          showToast('success', `Comparison database rebuilt! ${data.inserted_rows} rows updated.`);
+          setTimeout(() => {
+            if (window.location.pathname === '/compare') {
+              window.location.reload();
+            }
+          }, 1200);
+        } else {
+          showToast('error', `Sync failed: ${data.error}`);
+        }
+      } catch (err) {
+        showToast('error', `Network error: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        if (btnText) btnText.textContent = "Sync Compare DB";
+        if (spinner) spinner.style.display = "none";
+      }
+    }
+
+    function showToast(type, message) {
+      let container = document.getElementById('toast-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        document.body.appendChild(container);
+      }
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.innerHTML = `
+        <span>${type === 'success' ? '✅' : '❌'}</span>
+        <div>${message}</div>
+      `;
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+      }, 10);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-20px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
     }
   </script>
 </body>
@@ -773,6 +2271,15 @@ def compare_dashboard():
         error=error,
         column_panel_open=bool(request.args.getlist("visible_columns")),
     )
+
+
+@app.route("/api/rebuild-compare", methods=["POST"])
+def api_rebuild_compare():
+    try:
+        inserted_rows = rebuild_compare_db()
+        return {"success": True, "inserted_rows": inserted_rows}
+    except Exception as e:
+        return {"success": False, "error": str(e)}, 500
 
 
 if __name__ == "__main__":
