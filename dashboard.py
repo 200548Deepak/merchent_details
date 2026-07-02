@@ -779,8 +779,8 @@ TEMPLATE = """
       "completedBuyOrderNum_diff": "Buy Orders Delta",
       "completedSellOrderNum": "Sell Orders",
       "completedSellOrderNum_diff": "Sell Orders Delta",
-      "avgReleaseTimeOfLatest30day": "Avg Release Time (30d)",
-      "avgPayTimeOfLatest30day": "Avg Pay Time (30d)",
+      "avgReleaseTimeOfLatest30day": "Avg Release Time (30d) (min)",
+      "avgPayTimeOfLatest30day": "Avg Pay Time (30d) (min)",
       "completedOrderNumOfLatest30day": "Orders (30d)",
       "date": "Data Date",
       "created_at": "Collected At",
@@ -842,6 +842,16 @@ TEMPLATE = """
           // Format None / Empty
           if (val === "None" || val === "" || val === "null") {
             td.innerHTML = `<span class="empty-cell">—</span>`;
+            return;
+          }
+
+          // Convert seconds to minutes for avg paytime and avg release time
+          if (header === "avgPayTimeOfLatest30day" || header === "avgReleaseTimeOfLatest30day") {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+              const minutes = num / 60.0;
+              td.textContent = `${minutes.toFixed(2)} min`;
+            }
             return;
           }
 
@@ -1753,7 +1763,7 @@ COMPARE_TEMPLATE = """
                     <thead>
                       <tr>
                         {% for col in columns %}
-                          <th>{{ col }}</th>
+                          <th data-col="{{ col }}">{{ col }}</th>
                         {% endfor %}
                       </tr>
                     </thead>
@@ -1860,8 +1870,8 @@ COMPARE_TEMPLATE = """
       "completedBuyOrderNum_diff": "Buy Orders Delta",
       "completedSellOrderNum": "sell",
       "completedSellOrderNum_diff": "Sell Orders Delta",
-      "avgReleaseTimeOfLatest30day": "avg release time",
-      "avgPayTimeOfLatest30day": "avg paytime",
+      "avgReleaseTimeOfLatest30day": "avg release time (min)",
+      "avgPayTimeOfLatest30day": "avg paytime (min)",
       "completedOrderNumOfLatest30day": "Orders (30d)",
       "date": "date",
       "created_at": "Collected At",
@@ -1905,10 +1915,10 @@ COMPARE_TEMPLATE = """
       // Format table headers
       const headers = document.querySelectorAll("thead th");
       headers.forEach(th => {
-        const colName = th.textContent.trim();
-        if (colName === "Rank" || colName === "Merchant" || colName === "Diff" || colName === "Username" || colName === "Delta Orders" || colName === "Rank Change") return;
+        const colName = th.getAttribute("data-col");
+        if (!colName) return;
         const human = getHumanLabel(colName);
-        th.innerHTML = `${human} <span class="empty-cell" style="font-size:10px; display:block; font-weight:normal; opacity:0.5; margin-top:2px;">${colName}</span>`;
+        th.textContent = human;
       });
 
       // Format checkboxes in Config Columns
@@ -1921,8 +1931,8 @@ COMPARE_TEMPLATE = """
 
       // Format cells
       const headerNames = Array.from(document.querySelectorAll("thead th")).map(th => {
-        const span = th.querySelector("span");
-        return span ? span.textContent.trim() : th.textContent.trim();
+        const rawCol = th.getAttribute("data-col");
+        return rawCol ? rawCol : th.textContent.trim();
       });
 
       const rows = document.querySelectorAll("tbody tr");
@@ -1930,12 +1940,22 @@ COMPARE_TEMPLATE = """
         const cells = row.querySelectorAll("td");
         cells.forEach((td, idx) => {
           const header = headerNames[idx];
-          if (header === "Rank" || header === "Merchant" || header === "Diff" || header === "Username" || header === "Delta Orders" || header === "Rank Change" || header === "buy" || header === "sell" || header === "tot orders") return;
+          if (header === "Rank" || header === "Merchant" || header === "Diff" || header === "Username" || header === "Delta Orders" || header === "Rank Change" || header === "buy" || header === "sell" || header === "tot orders" || header === "finishRateLatest30day" || header === "finishrate") return;
           const val = td.textContent.trim();
 
           // Format None / Empty
           if (val === "None" || val === "" || val === "null") {
             td.innerHTML = `<span class="empty-cell">—</span>`;
+            return;
+          }
+
+          // Convert seconds to minutes for avg paytime and avg release time
+          if (header === "avgPayTimeOfLatest30day" || header === "avgReleaseTimeOfLatest30day") {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+              const minutes = num / 60.0;
+              td.textContent = `${minutes.toFixed(2)} min`;
+            }
             return;
           }
 
@@ -2343,7 +2363,12 @@ def format_compare_deltas(columns: List[str], rows: List[Tuple]) -> List[Tuple]:
     except ValueError:
         tot_idx = tot_diff_idx = None
 
-    if buy_idx is None and sell_idx is None and tot_idx is None:
+    try:
+        finish_idx = columns.index("finishRateLatest30day")
+    except ValueError:
+        finish_idx = None
+
+    if buy_idx is None and sell_idx is None and tot_idx is None and finish_idx is None:
         return rows
 
     formatted_rows: List[Tuple] = []
@@ -2400,6 +2425,16 @@ def format_compare_deltas(columns: List[str], rows: List[Tuple]) -> List[Tuple]:
                             row_list[tot_idx] = f"{tot_val} <span style='color: var(--text-muted); font-weight: 600;'>(0)</span>"
                     except ValueError:
                         pass
+                        
+        # Format Finish Rate to percentage
+        if finish_idx is not None:
+            finish_val = row_list[finish_idx]
+            if finish_val is not None:
+                try:
+                    pct_val = float(finish_val) * 100.0
+                    row_list[finish_idx] = f"{pct_val:.1f}%"
+                except ValueError:
+                    pass
                         
         formatted_rows.append(tuple(row_list))
     return formatted_rows
