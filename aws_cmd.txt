@@ -44,4 +44,4 @@ ubuntu@13.201.32.179:/home/ubuntu/merchent_details/binance_merch.db \
 /e/Deepak/Work/merchent_details/
 
 (To send files to EC2)[RUN in gitbash]
-$ scp -i "/e/Deepak/Work/AWS/cloud200548.pem" "/e/Deepak/Work/merchent_details/dashboard.py" ubuntu@13.201.32.179:/home/ubuntu/merchent_details/
+scp -i "/e/Deepak/Work/AWS/cloud200548.pem" "/e/Deepak/Work/merchent_details/dashboard.py" ubuntu@13.201.32.179:/home/ubuntu/merchent_details/
