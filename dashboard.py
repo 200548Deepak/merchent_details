@@ -779,8 +779,8 @@ TEMPLATE = """
       "completedBuyOrderNum_diff": "Buy Orders Delta",
       "completedSellOrderNum": "Sell Orders",
       "completedSellOrderNum_diff": "Sell Orders Delta",
-      "avgReleaseTimeOfLatest30day": "Avg Release Time (30d)",
-      "avgPayTimeOfLatest30day": "Avg Pay Time (30d)",
+      "avgReleaseTimeOfLatest30day": "Avg Release Time (30d) (min)",
+      "avgPayTimeOfLatest30day": "Avg Pay Time (30d) (min)",
       "completedOrderNumOfLatest30day": "Orders (30d)",
       "date": "Data Date",
       "created_at": "Collected At",
@@ -842,6 +842,16 @@ TEMPLATE = """
           // Format None / Empty
           if (val === "None" || val === "" || val === "null") {
             td.innerHTML = `<span class="empty-cell">—</span>`;
+            return;
+          }
+
+          // Convert seconds to minutes for avg paytime and avg release time
+          if (header === "avgPayTimeOfLatest30day" || header === "avgReleaseTimeOfLatest30day") {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+              const minutes = num / 60.0;
+              td.textContent = `${minutes.toFixed(2)} min`;
+            }
             return;
           }
 
@@ -1860,8 +1870,8 @@ COMPARE_TEMPLATE = """
       "completedBuyOrderNum_diff": "Buy Orders Delta",
       "completedSellOrderNum": "sell",
       "completedSellOrderNum_diff": "Sell Orders Delta",
-      "avgReleaseTimeOfLatest30day": "avg release time",
-      "avgPayTimeOfLatest30day": "avg paytime",
+      "avgReleaseTimeOfLatest30day": "avg release time (min)",
+      "avgPayTimeOfLatest30day": "avg paytime (min)",
       "completedOrderNumOfLatest30day": "Orders (30d)",
       "date": "date",
       "created_at": "Collected At",
@@ -1936,6 +1946,16 @@ COMPARE_TEMPLATE = """
           // Format None / Empty
           if (val === "None" || val === "" || val === "null") {
             td.innerHTML = `<span class="empty-cell">—</span>`;
+            return;
+          }
+
+          // Convert seconds to minutes for avg paytime and avg release time
+          if (header === "avgPayTimeOfLatest30day" || header === "avgReleaseTimeOfLatest30day") {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+              const minutes = num / 60.0;
+              td.textContent = `${minutes.toFixed(2)} min`;
+            }
             return;
           }
 
