@@ -8,7 +8,7 @@ cd merchent_details
 nohup /home/ubuntu/merchent_details/venv/bin/python3 fetch2.py > fetch2.log 2>&1 &
 
 (To check weather the fetch.py is running)
-ps aux | grep "[f]etch2.py"
+ps aux | grep fetch2.py
 or
 top
 
